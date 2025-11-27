@@ -1,2 +1,9 @@
 .backups/
+.vscode/
+node_modules/
+types/
+.editor
+package.json
+package-lock.json
+tsconfig.json
 .operations.log
