@@ -5,9 +5,10 @@
 //
 // Modified by Hyunseok Oh on November 28, 2025
 
-import { Behaviour } from 'Behaviour';
+import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { CodeBlockEvents, Component, Entity, Player, PropTypes, Vec3, Quaternion, SpawnPointGizmo, TextGizmo } from 'horizon/core';
 import { SublevelEntity } from 'horizon/world_streaming';
+import LevelController from './LevelController';
 
 class PartyMaker extends Behaviour<typeof PartyMaker> {
   static propsDefinition = {
@@ -15,7 +16,12 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     countdownDuration: { type: PropTypes.Number, default: 10 },
     countdownTextGizmo: { type: PropTypes.Entity },
     subLevelEntity: { type: PropTypes.Entity },
+    levelControllerEntity: { type: PropTypes.Entity },
   };
+
+  public static coreEntities: Entity[] = [];
+  public static fixedSpawnEntities: Entity[] = [];
+  public static spawnEntities: Entity[] = [];
 
   private playersInTeam: Player[] = [];
   private isCountdownRunning: boolean = false;
@@ -146,6 +152,23 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     this.waitForEntity(sublevel, "[Level]", 10, 200).then((levelEntity) => {
       if (levelEntity) {
         console.log("[PartyMaker] '[Level]' entity located successfully after teleport.");
+        const targetNames = ["[Core]", "[FixedSpawn]", "[Spawn]"];
+        const grouped = this.collectChildEntitiesByName(levelEntity, targetNames);
+        targetNames.forEach((name) => {
+          const entities = grouped[name] ?? [];
+          const sharedArray = this.getSharedArrayByName(name);
+          if (!sharedArray) {
+            console.warn(`[PartyMaker] No shared array registered for ${name}.`);
+            return;
+          }
+          sharedArray.length = 0;
+          sharedArray.push(...entities);
+          console.log(`[PartyMaker] ${name} count under [Level]: ${sharedArray.length}`);
+          sharedArray.forEach((entity, index) => {
+            console.log(`[PartyMaker]   - (${index}) ${entity.name.get()}`);
+          });
+        });
+        this.configureLevelController();
       } else {
         console.warn("[PartyMaker] '[Level]' entity could not be located after teleport.");
       }
@@ -191,6 +214,78 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     }
 
     return null;
+  }
+
+  private collectChildEntitiesByName(root: Entity, targetNames: string[]): Record<string, Entity[]> {
+    const grouped: Record<string, Entity[]> = {};
+    const targets = new Set(targetNames);
+    const queue: Entity[] = [...root.children.get()];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentName = current.name.get();
+      const baseName = this.getMatchingBaseName(currentName, targets);
+      if (baseName) {
+        if (!grouped[baseName]) {
+          grouped[baseName] = [];
+        }
+        grouped[baseName].push(current);
+      }
+
+      const children = current.children.get();
+      for (const child of children) {
+        queue.push(child);
+      }
+    }
+
+    return grouped;
+  }
+
+  private getMatchingBaseName(actualName: string, targets: Set<string>): string | null {
+    if (targets.has(actualName)) {
+      return actualName;
+    }
+
+    const match = actualName.match(/^(\[[^\]]+\])(?:\s*\((\d+)\)|\s+(\d+))$/);
+    if (!match) {
+      return null;
+    }
+
+    const baseName = match[1];
+    return targets.has(baseName) ? baseName : null;
+  }
+
+  private getSharedArrayByName(name: string): Entity[] | null {
+    switch (name) {
+      case "[Core]":
+        return PartyMaker.coreEntities;
+      case "[FixedSpawn]":
+        return PartyMaker.fixedSpawnEntities;
+      case "[Spawn]":
+        return PartyMaker.spawnEntities;
+      default:
+        return null;
+    }
+  }
+
+  private configureLevelController() {
+    const controllerEntity = this.props.levelControllerEntity;
+    if (!controllerEntity) {
+      console.warn("[PartyMaker] No LevelController entity assigned.");
+      return;
+    }
+
+    const controller = BehaviourFinder.GetBehaviour<LevelController>(controllerEntity);
+    if (!controller) {
+      console.error("[PartyMaker] Assigned LevelController entity is missing LevelController behaviour.");
+      return;
+    }
+
+    controller.Setup({
+      coreEntities: PartyMaker.coreEntities,
+      fixedSpawnEntities: PartyMaker.fixedSpawnEntities,
+      spawnEntities: PartyMaker.spawnEntities,
+    });
   }
 }
 Component.register(PartyMaker);
