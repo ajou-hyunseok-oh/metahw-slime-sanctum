@@ -8,7 +8,7 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { CodeBlockEvents, Component, Entity, Player, PropTypes, Vec3, Quaternion, SpawnPointGizmo, TextGizmo } from 'horizon/core';
 import { SublevelEntity } from 'horizon/world_streaming';
-import LevelController from './LevelController';
+import { LevelController } from 'LevelController';  
 
 class PartyMaker extends Behaviour<typeof PartyMaker> {
   static propsDefinition = {
