@@ -165,6 +165,8 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     this.stateMachine?.changeState(SlimeKingState.Hit);
   }
 
+
+
   private acquireTarget() {
     let closestDistanceSq = Math.pow(this.config.maxVisionDistance, 2);
     const monsterPosition = this.entity.position.get();

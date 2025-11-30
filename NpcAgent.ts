@@ -40,10 +40,10 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     agentFPS: { type: PropTypes.Number, default: 4 },
     headHeight: { type: PropTypes.Number, default: 1.8 },
     collider: { type: PropTypes.Entity },
-    configName: { type: PropTypes.String, default: "default" }
+    model: { type: PropTypes.Entity },
+    configName: { type: PropTypes.String, default: "default" }    
   };
-
-  private assetRef?: AssetBundleInstanceReference;
+  
   private navMesh?: INavMesh | null = null;
   private navAgent?: NavMeshAgent | null = null;
   private frameTimer: number = 0.0;
@@ -55,14 +55,25 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
   private animMoving: boolean = false;
   private animSpeed: number = 0.0;
+  private idleScaleActive: boolean = false;
+  private idleScaleProgress: number = 0;
+  private readonly idleScaleSlowDuration: number = 1.8;
+  private readonly idleScaleFastDuration: number = 1.0;
+  private readonly idleScaleNormal: Vec3 = new Vec3(1, 1, 1);
+  private readonly idleScaleCompressed: Vec3 = new Vec3(1.1, 0.85, 1.1);
+  private attackScaleActive: boolean = false;
+  private attackScaleElapsed: number = 0;
+  private readonly attackScaleDuration: number = 0.6;
+  private readonly attackScaleExpand: Vec3 = new Vec3(1.2, 0.8, 1.2);
+  private readonly attackScaleCompress: Vec3 = new Vec3(0.9, 1.2, 0.9);
+  private navigationFrozen: boolean = false;
 
   isDead: boolean = false;
 
   protected stateMachine: StateMachine | null = null;
   protected config: any = null;
 
-  Start() {
-    this.assetRef = this.entity.as(AssetBundleGizmo)?.getRoot();
+  Start() {    
     this.resetAllAnimationParameters();
 
     this.config = NpcConfigStore.instance.getNpcConfig(this.props.configName);
@@ -93,7 +104,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.updateLookAtAnimationParameters(deltaTime);
 
     // Only update destination at FPS rate
-    if (this.frameTimer >= 1.0 / this.props.agentFPS) {
+    if (!this.navigationFrozen && this.frameTimer >= 1.0 / this.props.agentFPS) {
       if (this.nextTarget != undefined) {
         var targetPos = this.navMesh?.getNearestPoint(this.nextTarget, 100)
         this.lastKnownGood = targetPos ?? this.lastKnownGood;
@@ -104,6 +115,8 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
     // Update the state machine
     this.stateMachine?.update(deltaTime);
+    this.updateIdleScaleAnimation(deltaTime);
+    this.updateAttackScaleAnimation(deltaTime);
   }
 
 
@@ -123,6 +136,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     if (this.isDead)
       return;
 
+    this.setNavigationFrozen(false);
     this.navAgent?.isImmobile.set(false);
     this.nextTarget = target;
   }
@@ -135,23 +149,29 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
       case NpcAnimation.Idle:
         this.navAgent?.isImmobile.set(true);
         this.nextTarget = this.entity.position.get();
+        this.stopAttackScaleAnimation(true);
+        this.startIdleScaleAnimation();
         break;
-      case NpcAnimation.Death:
-        this.assetRef?.setAnimationParameterBool("Death", true);
+      case NpcAnimation.Death:        
         this.navAgent?.isImmobile.set(true);
         this.nextTarget = undefined;
         this.isDead = true;
         this.props.collider?.collidable.set(false);
+        this.stopIdleScaleAnimation(true);
+        this.stopAttackScaleAnimation(true);
         break;
       case NpcAnimation.Hit:
-        this.assetRef?.setAnimationParameterTrigger("Hit");
+        this.stopIdleScaleAnimation(true);
+        this.stopAttackScaleAnimation(true);
         break;
       case NpcAnimation.Attack:
-        this.navAgent?.isImmobile.set(true);
-        this.assetRef?.setAnimationParameterTrigger("Attack");
+        this.setNavigationFrozen(true);
+        this.stopIdleScaleAnimation(true);
+        this.startAttackScaleAnimation();
         break;
       default:
-        this.assetRef?.setAnimationParameterTrigger(animation);
+        this.stopIdleScaleAnimation(true);
+        this.stopAttackScaleAnimation(true);
     }
   }
 
@@ -196,18 +216,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
   // Private methods
   private resetAllAnimationParameters() {
-    if (this.assetRef === undefined || this.assetRef === null) {
-      console.warn("NpcAgent::resetAllAnimationParameters() Attempted to reset all animation triggers on an undefined assetRef");
-    }
-    // Can also use this.assetRef?.resetAnimationParameterTrigger("Death"); but we're specifying values here so that they can be easily overriden for default state
-    this.assetRef?.setAnimationParameterBool("Death", false);
-    this.assetRef?.setAnimationParameterBool("Moving", false);
-    this.assetRef?.setAnimationParameterBool("Falling", false);
-    this.assetRef?.setAnimationParameterFloat("LookX", 0);
-    this.assetRef?.setAnimationParameterFloat("LookY", 0);
-    this.assetRef?.setAnimationParameterFloat("Speed", 0);
-    this.assetRef?.setAnimationParameterFloat("RotateSpeed", 0);
-    this.assetRef?.setAnimationParameterFloat("Random", 0);
+    console.log("NpcAgent::resetAllAnimationParameters()");
   }
 
   private updateSpeedAnimationParameters(deltaTime: number) {
@@ -220,14 +229,12 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     }
 
     if (speedAnimationValue != this.animSpeed) {
-      this.animSpeed = speedAnimationValue;
-      this.assetRef?.setAnimationParameterFloat("Speed", speedAnimationValue);
+      this.animSpeed = speedAnimationValue;      
     }
 
     var movingAnimationValue = speedAnimationValue > 0.0;
     if (movingAnimationValue != this.animMoving) {
-      this.animMoving = movingAnimationValue;
-      this.assetRef?.setAnimationParameterBool("Moving", movingAnimationValue);
+      this.animMoving = movingAnimationValue;      
     }
   }
 
@@ -267,10 +274,147 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
     if (this.currentLookAt != targetLookAt) {
       this.currentLookAt = targetLookAt;
+    }    
+  }
+
+  private startIdleScaleAnimation() {
+    if (this.idleScaleActive)
+      return;
+
+    this.idleScaleActive = true;
+    this.idleScaleProgress = 0;
+    this.applyIdleScale(0);
+  }
+
+  private stopIdleScaleAnimation(resetToDefault: boolean = false) {
+    if (!this.idleScaleActive && !resetToDefault)
+      return;
+
+    this.idleScaleActive = false;
+    if (resetToDefault) {
+      const modelEntity = this.props.model ?? this.entity;
+      modelEntity.scale.set(this.idleScaleNormal);
+    }
+  }
+
+  private updateIdleScaleAnimation(deltaTime: number) {
+    if (!this.idleScaleActive)
+      return;
+
+    const modelEntity = this.props.model ?? this.entity;
+    if (!modelEntity)
+      return;
+
+    const duration = this.hasActiveMovementTarget() ? this.idleScaleFastDuration : this.idleScaleSlowDuration;
+    const progressDelta = deltaTime / duration;
+    this.idleScaleProgress = (this.idleScaleProgress + progressDelta) % 1;
+    const progress = this.idleScaleProgress;
+    const currentScale = this.calculateIdleScale(progress);
+
+    modelEntity.scale.set(currentScale);
+  }
+
+  private calculateIdleScale(progress: number): Vec3 {
+    if (progress < 0.5) {
+      const t = progress / 0.5;
+      return this.lerpVec3(this.idleScaleNormal, this.idleScaleCompressed, t);
     }
 
-    this.assetRef?.setAnimationParameterFloat("LookX", this.currentLookAt.x);
-    this.assetRef?.setAnimationParameterFloat("LookY", this.currentLookAt.y);
+    const t = (progress - 0.5) / 0.5;
+    return this.lerpVec3(this.idleScaleCompressed, this.idleScaleNormal, t);
+  }
+
+  private applyIdleScale(progress: number) {
+    const modelEntity = this.props.model ?? this.entity;
+    if (!modelEntity)
+      return;
+
+    modelEntity.scale.set(this.calculateIdleScale(progress));
+  }
+
+  private startAttackScaleAnimation() {
+    this.attackScaleActive = true;
+    this.attackScaleElapsed = 0;
+    this.applyAttackScale(0);
+  }
+
+  private stopAttackScaleAnimation(resetToDefault: boolean = false) {
+    if (!this.attackScaleActive && !resetToDefault)
+      return;
+
+    this.attackScaleActive = false;
+    if (resetToDefault) {
+      const modelEntity = this.props.model ?? this.entity;
+      modelEntity.scale.set(this.idleScaleNormal);
+    }
+  }
+
+  private updateAttackScaleAnimation(deltaTime: number) {
+    if (!this.attackScaleActive)
+      return;
+
+    const modelEntity = this.props.model ?? this.entity;
+    if (!modelEntity)
+      return;
+
+    this.attackScaleElapsed += deltaTime;
+    if (this.attackScaleElapsed >= this.attackScaleDuration) {
+      this.attackScaleActive = false;
+      modelEntity.scale.set(this.idleScaleNormal);
+      return;
+    }
+
+    const progress = this.attackScaleElapsed / this.attackScaleDuration;
+    const currentScale = this.calculateAttackScale(progress);
+    modelEntity.scale.set(currentScale);
+  }
+
+  private calculateAttackScale(progress: number): Vec3 {
+    if (progress < 0.3) {
+      const t = progress / 0.3;
+      return this.lerpVec3(this.idleScaleNormal, this.attackScaleExpand, t);
+    }
+
+    if (progress < 0.7) {
+      const t = (progress - 0.3) / 0.4;
+      return this.lerpVec3(this.attackScaleExpand, this.attackScaleCompress, t);
+    }
+
+    const t = (progress - 0.7) / 0.3;
+    return this.lerpVec3(this.attackScaleCompress, this.idleScaleNormal, t);
+  }
+
+  private applyAttackScale(progress: number) {
+    const modelEntity = this.props.model ?? this.entity;
+    if (!modelEntity)
+      return;
+
+    modelEntity.scale.set(this.calculateAttackScale(progress));
+  }
+
+  private setNavigationFrozen(frozen: boolean) {
+    if (this.navigationFrozen === frozen)
+      return;
+
+    this.navigationFrozen = frozen;
+    if (frozen) {
+      this.nextTarget = undefined;
+    }
+  }
+
+  private hasActiveMovementTarget(): boolean {
+    if (this.navigationFrozen || this.nextTarget === undefined)
+      return false;
+
+    const distanceSq = this.nextTarget.distanceSquared(this.entity.position.get());
+    return distanceSq > 0.01;
+  }
+
+  private lerpVec3(start: Vec3, end: Vec3, t: number): Vec3 {
+    const x = start.x + (end.x - start.x) * t;
+    const y = start.y + (end.y - start.y) * t;
+    const z = start.z + (end.z - start.z) * t;
+    return new Vec3(x, y, z);
   }
 }
 Component.register(NpcAgent);
