@@ -30,9 +30,7 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     deathSfx: { type: PropTypes.Entity },
   };
 
-  players: Player[] = [];
   hitPoints: number = 1;
-  targetPlayer: Player | undefined = undefined;
   startLocation!: Vec3;  
 
   // START State Machine Config *********************************************
@@ -50,7 +48,12 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     new StateConfigRecord(
       SlimePinkState.AcquireTarget,
       [
-        new StateCallbackConfig(StateCallbacks.OnEnter, () => this.acquireTarget())
+        new StateCallbackConfig(StateCallbacks.OnEnter, () => {
+          this.refreshTargetFromWorld();
+          if (this.isTargetWithinAttackDistance()) {
+            this.stateMachine?.changeState(SlimePinkState.Attacking);
+          }
+        })
       ],
       [
         new NextStateEdges(() => this.targetPlayer !== undefined, [
@@ -103,7 +106,7 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
         })
       ],
       [
-        new NextStateEdges(() => this.stateMachine!.timer >= this.config.attacksPerSecond, [[SlimePinkState.AcquireTarget, 1.0]]),
+        new NextStateEdges(() => this.stateMachine!.timer >= this.getAttackIntervalSeconds(), [[SlimePinkState.AcquireTarget, 1.0]]),
       ]
     ),
 
@@ -165,18 +168,8 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     this.stateMachine?.changeState(SlimePinkState.Hit);
   }
 
-  private acquireTarget() {
-    let closestDistanceSq = Math.pow(this.config.maxVisionDistance, 2);
-    const monsterPosition = this.entity.position.get();
-    this.world.getPlayers().forEach((player) => {
-      const playerPosition = player.position.get();
-      const distanceSq = monsterPosition.distanceSquared(playerPosition);
-      if (distanceSq < closestDistanceSq) {
-        closestDistanceSq = distanceSq;
-        this.targetPlayer = player;
-        return;
-      }
-    });
+  protected override shouldAutoAcquireDuringIdle(): boolean {
+    return true;
   }
 
   private updateWalkAndRunStates(deltaTime: number) {

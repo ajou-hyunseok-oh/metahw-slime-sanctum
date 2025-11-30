@@ -30,10 +30,7 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     deathSfx: { type: PropTypes.Entity },
   };
 
-  players: Player[] = [];
   hitPoints: number = 1;
-  targetPlayer: Player | undefined = undefined;
-  startLocation!: Vec3;  
 
   // START State Machine Config *********************************************
   slimeKingConfig: StateConfigRecord[] = [
@@ -50,7 +47,12 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     new StateConfigRecord(
       SlimeKingState.AcquireTarget,
       [
-        new StateCallbackConfig(StateCallbacks.OnEnter, () => this.acquireTarget())
+        new StateCallbackConfig(StateCallbacks.OnEnter, () => {
+          this.refreshTargetFromWorld();
+          if (this.isTargetWithinAttackDistance()) {
+            this.stateMachine?.changeState(SlimeKingState.Attacking);
+          }
+        })
       ],
       [
         new NextStateEdges(() => this.targetPlayer !== undefined, [
@@ -103,7 +105,7 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
         })
       ],
       [
-        new NextStateEdges(() => this.stateMachine!.timer >= this.config.attacksPerSecond, [[SlimeKingState.AcquireTarget, 1.0]]),
+        new NextStateEdges(() => this.stateMachine!.timer >= this.getAttackIntervalSeconds(), [[SlimeKingState.AcquireTarget, 1.0]]),
       ]
     ),
 
@@ -147,7 +149,6 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     super.Start();
 
     this.hitPoints = this.config.minHp + Math.floor((this.config.maxHp - this.config.minHp) * Math.random());
-    this.startLocation = this.entity.position.get();
     this.stateMachine = new StateMachine(Object.values(SlimeKingState), this.slimeKingConfig);
     this.stateMachine.changeState(SlimeKingState.Idle);    
   }
@@ -167,18 +168,8 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
 
 
 
-  private acquireTarget() {
-    let closestDistanceSq = Math.pow(this.config.maxVisionDistance, 2);
-    const monsterPosition = this.entity.position.get();
-    this.world.getPlayers().forEach((player) => {
-      const playerPosition = player.position.get();
-      const distanceSq = monsterPosition.distanceSquared(playerPosition);
-      if (distanceSq < closestDistanceSq) {
-        closestDistanceSq = distanceSq;
-        this.targetPlayer = player;
-        return;
-      }
-    });
+  protected override shouldAutoAcquireDuringIdle(): boolean {
+    return true;
   }
 
   private updateWalkAndRunStates(deltaTime: number) {

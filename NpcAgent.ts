@@ -67,6 +67,9 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
   private readonly attackScaleExpand: Vec3 = new Vec3(1.2, 0.8, 1.2);
   private readonly attackScaleCompress: Vec3 = new Vec3(0.9, 1.2, 0.9);
   private navigationFrozen: boolean = false;
+  protected targetPlayer: Player | undefined = undefined;
+  private currentAnimation: NpcAnimation | null = null;
+  private autoAcquireTimer: number = 0;
 
   isDead: boolean = false;
 
@@ -117,6 +120,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.stateMachine?.update(deltaTime);
     this.updateIdleScaleAnimation(deltaTime);
     this.updateAttackScaleAnimation(deltaTime);
+    this.updateAutoAcquireTarget(deltaTime);
   }
 
 
@@ -145,6 +149,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     if (this.isDead)
       return;
 
+    this.currentAnimation = animation;
     switch (animation) {
       case NpcAnimation.Idle:
         this.navAgent?.isImmobile.set(true);
@@ -165,6 +170,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
         this.stopAttackScaleAnimation(true);
         break;
       case NpcAnimation.Attack:
+        this.navAgent?.isImmobile.set(true);
         this.setNavigationFrozen(true);
         this.stopIdleScaleAnimation(true);
         this.startAttackScaleAnimation();
@@ -392,6 +398,102 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     modelEntity.scale.set(this.calculateAttackScale(progress));
   }
 
+  private updateAutoAcquireTarget(deltaTime: number) {
+    if (!this.shouldAutoAcquireDuringIdle()) {
+      this.autoAcquireTimer = 0;
+      return;
+    }
+
+    const radius = this.getAutoAcquireRadius();
+    if (radius <= 0)
+      return;
+
+    this.validateCurrentTarget(radius);
+    if (this.targetPlayer !== undefined) {
+      this.autoAcquireTimer = 0;
+      return;
+    }
+
+    if (this.currentAnimation !== NpcAnimation.Idle) {
+      this.autoAcquireTimer = 0;
+      return;
+    }
+
+    this.autoAcquireTimer += deltaTime;
+    if (this.autoAcquireTimer >= this.getAutoAcquireIntervalSeconds()) {
+      this.autoAcquireTimer = 0;
+      this.refreshTargetFromWorld(radius);
+    }
+  }
+
+  protected refreshTargetFromWorld(maxDistance?: number): Player | undefined {
+    const radius = maxDistance ?? this.getAutoAcquireRadius();
+    if (radius <= 0) {
+      this.targetPlayer = undefined;
+      return undefined;
+    }
+
+    const target = this.findClosestPlayerWithinRadius(radius);
+    this.targetPlayer = target;
+    return target;
+  }
+
+  protected shouldAutoAcquireDuringIdle(): boolean {
+    return false;
+  }
+
+  protected getAutoAcquireIntervalSeconds(): number {
+    return 1.0;
+  }
+
+  protected getAutoAcquireRadius(): number {
+    if (!this.config)
+      return 0;
+
+    return this.config.maxVisionDistance ?? 0;
+  }
+
+  protected getAttackIntervalSeconds(): number {
+    const attacksPerSecond = this.config?.attacksPerSecond ?? 1;
+    if (attacksPerSecond <= 0)
+      return 1;
+
+    return 1 / attacksPerSecond;
+  }
+
+  private findClosestPlayerWithinRadius(radius: number): Player | undefined {
+    const players = this.world.getPlayers ? this.world.getPlayers() : [];
+    if (players.length === 0)
+      return undefined;
+
+    const monsterPosition = this.entity.position.get();
+    const maxDistanceSq = Math.pow(radius, 2);
+    let closestPlayer: Player | undefined = undefined;
+    let closestDistanceSq = maxDistanceSq;
+
+    players.forEach((player) => {
+      const playerPosition = player.position.get();
+      const distanceSq = monsterPosition.distanceSquared(playerPosition);
+      if (distanceSq < closestDistanceSq) {
+        closestDistanceSq = distanceSq;
+        closestPlayer = player;
+      }
+    });
+
+    return closestPlayer;
+  }
+
+  private validateCurrentTarget(radius: number) {
+    if (this.targetPlayer === undefined)
+      return;
+
+    const monsterPosition = this.entity.position.get();
+    const playerPosition = this.targetPlayer.position.get();
+    if (monsterPosition.distanceSquared(playerPosition) > Math.pow(radius, 2)) {
+      this.targetPlayer = undefined;
+    }
+  }
+
   private setNavigationFrozen(frozen: boolean) {
     if (this.navigationFrozen === frozen)
       return;
@@ -408,6 +510,22 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
     const distanceSq = this.nextTarget.distanceSquared(this.entity.position.get());
     return distanceSq > 0.01;
+  }
+
+  protected isTargetWithinDistance(distance: number): boolean {
+    if (!this.targetPlayer || distance <= 0)
+      return false;
+
+    const monsterPosition = this.entity.position.get();
+    const playerPosition = this.targetPlayer.position.get();
+    return monsterPosition.distanceSquared(playerPosition) <= Math.pow(distance, 2);
+  }
+
+  protected isTargetWithinAttackDistance(): boolean {
+    if (!this.config || this.config.maxAttackDistance === undefined)
+      return false;
+
+    return this.isTargetWithinDistance(this.config.maxAttackDistance);
   }
 
   private lerpVec3(start: Vec3, end: Vec3, t: number): Vec3 {
