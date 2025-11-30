@@ -7,11 +7,10 @@
 
 import { Behaviour } from 'Behaviour';
 import { Component, Entity, PropTypes, CodeBlockEvents, Player, GrabbableEntity, Handedness, AvatarGripPoseAnimationNames } from 'horizon/core';
+import { PlayerManager, PlayerMode } from 'PlayerManager';
 
 class StartingZone extends Behaviour<typeof StartingZone> {
-  static propsDefinition = {
-    weaponAsset: { type: PropTypes.Asset },
-    weaponEntity: { type: PropTypes.Entity },
+  static propsDefinition = {    
   };
 
   private playersHoldingWeapon: Set<number> = new Set();
@@ -19,19 +18,21 @@ class StartingZone extends Behaviour<typeof StartingZone> {
   Awake() {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterTrigger, this.onPlayerEnterTrigger.bind(this));
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerExitTrigger, this.onPlayerExitTrigger.bind(this));
-    this.registerWeaponInputEvents();
+    //this.registerWeaponInputEvents();
   }
 
   onPlayerEnterTrigger(player: Player) {
     console.log(`Player ${player.name.get()} entered.`);
-    this.giveWeaponToPlayer(player);
+    PlayerManager.instance.setPlayerMode(player, PlayerMode.Match);
+    //this.giveWeaponToPlayer(player);
   }
 
   onPlayerExitTrigger(player: Player) {
     console.log(`Player ${player.name.get()} exited.`);
-    this.playersHoldingWeapon.delete(player.id);
+    //this.playersHoldingWeapon.delete(player.id);
   }
 
+  /*
   private giveWeaponToPlayer(player: Player) {
     const weaponEntity = this.props.weaponEntity;
     if (!weaponEntity) {
@@ -102,5 +103,6 @@ class StartingZone extends Behaviour<typeof StartingZone> {
       console.error(`[GrabZone] 대체 애니메이션 재생 실패: ${error}`);
     }
   }
+  */
 }
 Component.register(StartingZone);

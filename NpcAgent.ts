@@ -222,7 +222,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
   // Private methods
   private resetAllAnimationParameters() {
-    console.log("NpcAgent::resetAllAnimationParameters()");
+    //console.log("NpcAgent::resetAllAnimationParameters()");
   }
 
   private updateSpeedAnimationParameters(deltaTime: number) {

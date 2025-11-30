@@ -42,7 +42,7 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
   }
 
   onPlayerEnterTrigger(player: Player) {
-    console.log(`Player ${player.name.get()} entered team${this.props.teamId}.`);
+    //console.log(`Player ${player.name.get()} entered team${this.props.teamId}.`);
 
     if (!this.playersInTeam.some(p => p.id === player.id)) {
       this.playersInTeam.push(player);
@@ -54,7 +54,7 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
   }
 
   onPlayerExitTrigger(player: Player) {
-    console.log(`Player ${player.name.get()} exited team${this.props.teamId}.`);
+    //console.log(`Player ${player.name.get()} exited team${this.props.teamId}.`);
 
     const index = this.playersInTeam.findIndex(p => p.id === player.id);
     if (index !== -1) {
@@ -119,7 +119,7 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
       return;
     }
 
-    console.log(`[PartyMaker] Activating sublevel: ${sublevel.name.get()}`);
+    //console.log(`[PartyMaker] Activating sublevel: ${sublevel.name.get()}`);
 
     sublevel.activate().then(() => {
       console.log(`[PartyMaker] Sublevel activated. Waiting for StartingPoint...`);
