@@ -38,7 +38,7 @@ export class Behaviour<TBehaviour extends ComponentWithConstructor<Record<string
   }
 
   dispose(): void {
-    this.Dispose
+    this.Dispose();
   }
 
   // Lifecycle hooks

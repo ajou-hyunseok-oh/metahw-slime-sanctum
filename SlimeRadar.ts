@@ -1,11 +1,8 @@
 import { BehaviourFinder } from 'Behaviour';
 import { CodeBlockEvents, Component, Entity, Player } from 'horizon/core';
-import { SlimeAgent } from './SlimeAgent';
 
 class SlimeRadar extends Component<typeof SlimeRadar> {
-  static propsDefinition = {};
-
-  private slimeAgent: SlimeAgent | null = null;
+  static propsDefinition = {};  
 
   preStart() {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterTrigger, this.OnPlayerEnterTrigger.bind(this));
@@ -15,11 +12,7 @@ class SlimeRadar extends Component<typeof SlimeRadar> {
   }
 
   start() {    
-    const parentEntity = this.entity.parent.get();
-    this.slimeAgent = BehaviourFinder.GetBehaviour<SlimeAgent>(parentEntity) ?? null;
-    if (this.slimeAgent == null) {
-      console.warn(`[SlimeRadar] SlimeAgent not found on parent of ${this.entity.name.get()}`);
-    }
+    const parentEntity = this.entity.parent.get();    
   }
 
   OnPlayerEnterTrigger(player: Player) {    

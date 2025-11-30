@@ -12,8 +12,7 @@ import { AssetBundleGizmo, AssetBundleInstanceReference } from "horizon/unity_as
 import { NpcConfigStore } from "NpcConfigStore";
 import { StateMachine } from "StateMachine";
 
-export enum NpcAnimation
-{
+export enum NpcAnimation {
   Idle = "Idle",
   Attack = "Attack",
   Hit = "Hit",
@@ -26,17 +25,16 @@ export enum NpcAnimation
   Point = "EmotePoint",
 }
 
-export enum NpcMovementSpeed
-{
+export enum NpcMovementSpeed {
   Walk,
   Run
 }
 
-export interface INpcAgent{
+export interface INpcAgent {
   isDead: boolean;
 }
 
-export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcAgent{
+export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcAgent {
   // Editable Properties
   static propsDefinition = {
     agentFPS: { type: PropTypes.Number, default: 4 },
@@ -61,7 +59,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
   isDead: boolean = false;
 
   protected stateMachine: StateMachine | null = null;
-  protected config : any = null;
+  protected config: any = null;
 
   Start() {
     this.assetRef = this.entity.as(AssetBundleGizmo)?.getRoot();
@@ -76,15 +74,15 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.navAgent.maxSpeed.set(this.config.runSpeed);
 
     // Get the navmesh reference so we can use it later
-    this.navAgent.getNavMesh().then(mesh => {this.navMesh = mesh!;});
+    this.navAgent.getNavMesh().then(mesh => { this.navMesh = mesh!; });
 
     // The starting position is a good position to fallback to
     this.lastKnownGood = this.entity.position.get();
 
-    this.connectNetworkEvent(this.props.collider!, Events.projectileHit,this.bulletHit.bind(this));
-    this.connectNetworkEvent(this.entity, Events.projectileHit,this.bulletHit.bind(this));
-    this.connectNetworkEvent(this.props.collider!, Events.axeHit,this.axeHit.bind(this));
-    this.connectNetworkEvent(this.entity, Events.axeHit,this.axeHit.bind(this));
+    this.connectNetworkEvent(this.props.collider!, Events.projectileHit, this.bulletHit.bind(this));
+    this.connectNetworkEvent(this.entity, Events.projectileHit, this.bulletHit.bind(this));
+    this.connectNetworkEvent(this.props.collider!, Events.axeHit, this.axeHit.bind(this));
+    this.connectNetworkEvent(this.entity, Events.axeHit, this.axeHit.bind(this));
   }
 
   Update(deltaTime: number) {
@@ -111,7 +109,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
   // public functionality
   setMovementSpeed(speed: NpcMovementSpeed) {
-    switch(speed){
+    switch (speed) {
       case NpcMovementSpeed.Walk:
         this.navAgent?.maxSpeed.set(this.config.walkSpeed);
         break;
@@ -129,11 +127,11 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.nextTarget = target;
   }
 
-  animate(animation : NpcAnimation){
+  animate(animation: NpcAnimation) {
     if (this.isDead)
       return;
 
-    switch(animation){
+    switch (animation) {
       case NpcAnimation.Idle:
         this.navAgent?.isImmobile.set(true);
         this.nextTarget = this.entity.position.get();
@@ -157,18 +155,18 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     }
   }
 
-  private bulletHit(data :{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player}){
+  private bulletHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player }) {
     var bulletDamage = this.config.minBulletDamage + Math.floor((this.config.maxBulletDamage - this.config.minBulletDamage) * Math.random());
 
     this.npcHit(data.hitPos, data.hitNormal, bulletDamage);
-    this.sendNetworkBroadcastEvent(Events.playerScoredHit, {player : data.fromPlayer, entity: this.entity});
+    this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
   }
 
-  private axeHit(data :{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player}){
+  private axeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player }) {
     var axeDamage = this.config.minAxeDamage + Math.floor((this.config.maxAxeDamage - this.config.minAxeDamage) * Math.random());
 
     this.npcHit(data.hitPos, data.hitNormal, axeDamage);
-    this.sendNetworkBroadcastEvent(Events.playerScoredHit, {player : data.fromPlayer, entity: this.entity});
+    this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
   }
 
   protected npcHit(hitPos: Vec3, hitNormal: Vec3, damage: number) {
@@ -177,8 +175,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
     FloatingTextManager.instance?.createFloatingText(damage.toString(), hitPos, Color.red);
 
-    if (damage >= this.config.knockbackMinDamage)
-    {
+    if (damage >= this.config.knockbackMinDamage) {
       // Push the NPC back opposite to the direction of the hit
       var hitDirection = hitNormal.mul(-1);
       hitDirection.y = 0;
@@ -187,12 +184,10 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
       var startPosition = this.entity.position.get();
 
       var moveInterval = this.async.setInterval(() => {
-        if (this.entity.position.get().sub(startPosition).magnitude() > damage * this.config.knockbackMultiplier)
-        {
+        if (this.entity.position.get().sub(startPosition).magnitude() > damage * this.config.knockbackMultiplier) {
           this.async.clearInterval(moveInterval);
         }
-        else
-        {
+        else {
           this.entity.position.set(this.entity.position.get().add(hitDirection));
         }
       }, 10);
@@ -200,7 +195,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
   }
 
   // Private methods
-  private resetAllAnimationParameters(){
+  private resetAllAnimationParameters() {
     if (this.assetRef === undefined || this.assetRef === null) {
       console.warn("NpcAgent::resetAllAnimationParameters() Attempted to reset all animation triggers on an undefined assetRef");
     }
@@ -267,7 +262,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
       const dotUp = Vec3.dot(this.entity.up.get(), delta);
       targetLookAt = new Vec3(Math.atan2(dotRight, dotForward), Math.atan2(dotUp, dotForward), 0);
       // bring the values between -1 and 1
-      targetLookAt.divInPlace(Math.PI * 2) ;
+      targetLookAt.divInPlace(Math.PI * 2);
     }
 
     if (this.currentLookAt != targetLookAt) {
