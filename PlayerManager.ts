@@ -8,7 +8,8 @@
 
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { GamePlayers } from 'GamePlayers';
-import { Component, Player, PropTypes } from 'horizon/core';
+import { Events } from 'Events';
+import { Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 
 export enum PlayerMode {
@@ -19,6 +20,14 @@ export enum PlayerMode {
 type ManagedPlayerState = {
   mode: PlayerMode;
 };
+
+const playerModeChangedEvent = (Events as unknown as {
+  playerModeChanged: NetworkEvent<{ mode: string }>;
+}).playerModeChanged;
+
+const playerModeRequestEvent = (Events as unknown as {
+  playerModeRequest: NetworkEvent<{ playerId: number }>;
+}).playerModeRequest;
 
 export class PlayerManager extends Behaviour<typeof PlayerManager> {
   static propsDefinition = {
@@ -45,6 +54,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
   Start() {
     this.weaponSelector = WeaponSelector.Instance ?? undefined;
+    this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));
   }
 
   public setPlayerMode(player: Player, mode: PlayerMode) {
@@ -67,6 +77,8 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   }
 
   private onPlayerModeChanged(player: Player, mode: PlayerMode) {
+    this.notifyPlayerMode(player, mode);
+
     switch (mode) {
       case PlayerMode.Lobby:
         console.log(`[PlayerManager] ${player.name.get()} -> Lobby`);
@@ -85,6 +97,24 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     }
 
     this.weaponSelector.grabWeapon(WeaponType.Melee, 1, player);
+  }
+
+  public getPlayerMode(player: Player): PlayerMode {
+    return this.getOrCreatePlayerState(player).mode;
+  }
+
+  private onPlayerModeRequest(data: { playerId: number }) {
+    const player = this.world.getPlayers().find((p) => p.id === data.playerId);
+    if (!player) {
+      return;
+    }
+
+    const mode = this.getPlayerMode(player);
+    this.notifyPlayerMode(player, mode);
+  }
+
+  private notifyPlayerMode(player: Player, mode: PlayerMode) {
+    this.sendNetworkEvent(player, playerModeChangedEvent, { mode });
   }
 }
 Component.register(PlayerManager);

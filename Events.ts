@@ -39,6 +39,8 @@ export const Events = {
   playerDataUpdate: new NetworkEvent<{ammo : number, hp: number}>('playerDataUpdate'),
   playerAmmoUpdate: new NetworkEvent<{player: Player, ammo : number}>('playerAmmoUpdate'),
   playerHpUpdate: new NetworkEvent<{player: Player, hp : number}>('playerHpUpdate'),
+  playerModeChanged: new NetworkEvent<{ mode: string }>('playerModeChanged'),
+  playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),
 };
 
 export const WaveManagerNetworkEvents = {
