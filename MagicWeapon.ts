@@ -1,10 +1,9 @@
 import * as hz from 'horizon/core';
+import { WeaponBase } from 'WeaponBase';
 
-class MagicWeapon extends hz.Component<typeof MagicWeapon> {
-  static propsDefinition = {};
-
-  start() {
-
+class MagicWeapon extends WeaponBase {
+  protected override getWeaponLogPrefix(): string {
+    return '[MagicWeapon]';
   }
 }
 hz.Component.register(MagicWeapon);
