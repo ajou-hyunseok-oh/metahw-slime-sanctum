@@ -8,7 +8,6 @@ import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
 import { Color, Component, Player, PropTypes, Vec3 } from "horizon/core";
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
-import { AssetBundleGizmo, AssetBundleInstanceReference } from "horizon/unity_asset_bundles";
 import { NpcConfigStore } from "NpcConfigStore";
 import { StateMachine } from "StateMachine";
 
@@ -32,6 +31,11 @@ export enum NpcMovementSpeed {
 
 export interface INpcAgent {
   isDead: boolean;
+}
+
+export interface NpcHealthSnapshot {
+  current: number;
+  max: number;
 }
 
 export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcAgent {
@@ -75,6 +79,9 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
   protected stateMachine: StateMachine | null = null;
   protected config: any = null;
+  protected hitPoints: number = 1;
+  protected maxHitPoints: number = 1;
+  private hpSubscribers: Set<(snapshot: NpcHealthSnapshot) => void> = new Set();
 
   Start() {    
     this.resetAllAnimationParameters();
@@ -121,6 +128,11 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.updateIdleScaleAnimation(deltaTime);
     this.updateAttackScaleAnimation(deltaTime);
     this.updateAutoAcquireTarget(deltaTime);
+  }
+
+  protected Dispose(): void {
+    this.hpSubscribers.clear();
+    super.Dispose();
   }
 
 
@@ -218,6 +230,87 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
         }
       }, 10);
     }
+  }
+
+  protected seedHitPointsFromConfig(): number {
+    const spawnHp = this.rollSpawnHitPoints();
+    this.maxHitPoints = spawnHp;
+    this.hitPoints = spawnHp;
+    this.publishHitPointsChanged();
+    return spawnHp;
+  }
+
+  protected applyDamage(amount: number): number {
+    if (amount <= 0)
+      return this.hitPoints;
+
+    const nextHp = Math.max(0, this.hitPoints - amount);
+    if (nextHp === this.hitPoints)
+      return this.hitPoints;
+
+    this.hitPoints = nextHp;
+    this.publishHitPointsChanged();
+    return this.hitPoints;
+  }
+
+  protected restoreHealth(amount: number): number {
+    if (amount <= 0)
+      return this.hitPoints;
+
+    const nextHp = Math.min(this.maxHitPoints, this.hitPoints + amount);
+    if (nextHp === this.hitPoints)
+      return this.hitPoints;
+
+    this.hitPoints = nextHp;
+    this.publishHitPointsChanged();
+    return this.hitPoints;
+  }
+
+  public getCurrentHitPoints(): number {
+    return this.hitPoints;
+  }
+
+  public getMaxHitPoints(): number {
+    return this.maxHitPoints;
+  }
+
+  public subscribeToHitPoints(listener: (snapshot: NpcHealthSnapshot) => void): () => void {
+    this.hpSubscribers.add(listener);
+    listener({ current: this.hitPoints, max: this.maxHitPoints });
+
+    return () => {
+      this.hpSubscribers.delete(listener);
+    };
+  }
+
+  private publishHitPointsChanged() {
+    const snapshot: NpcHealthSnapshot = { current: this.hitPoints, max: this.maxHitPoints };
+    this.onHitPointsChanged(snapshot);
+    this.hpSubscribers.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.warn("NpcAgent::publishHitPointsChanged error", error);
+      }
+    });
+  }
+
+  protected onHitPointsChanged(snapshot: NpcHealthSnapshot): void {
+    // default no-op
+  }
+
+  private rollSpawnHitPoints(): number {
+    const minHpConfig = typeof this.config?.minHp === "number" ? this.config.minHp : 1;
+    const maxHpConfig = typeof this.config?.maxHp === "number" ? this.config.maxHp : minHpConfig;
+
+    const minHp = Math.max(1, minHpConfig);
+    const maxHp = Math.max(minHp, maxHpConfig);
+
+    if (maxHp === minHp)
+      return minHp;
+
+    const range = maxHp - minHp;
+    return minHp + Math.floor(Math.random() * (range + 1));
   }
 
   // Private methods
@@ -536,3 +629,4 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
   }
 }
 Component.register(NpcAgent);
+

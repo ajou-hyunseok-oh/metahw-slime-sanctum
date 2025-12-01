@@ -7,9 +7,9 @@
 
 import { AudioGizmo, Component, Entity, Player, PropTypes, Vec3 } from "horizon/core";
 import { LootSystem } from "LootSystem";
-import { NpcAgent, NpcAnimation, NpcMovementSpeed } from "NpcAgent";
-import { PlayerManager } from "PlayerManager";
+import { NpcAgent, NpcAnimation, NpcHealthSnapshot, NpcMovementSpeed } from "NpcAgent";
 import { NextStateEdges, StateCallbackConfig, StateCallbacks, StateConfigRecord, StateMachine } from "StateMachine";
+import { SlimeHUD } from "SlimeHUD";
 
 enum SlimeBlueState {
   Idle = "Idle",
@@ -31,8 +31,6 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
     hitSfx: { type: PropTypes.Entity },
     deathSfx: { type: PropTypes.Entity },
   };
-
-  hitPoints: number = 1;
 
   // START State Machine Config *********************************************
   slimeBlueConfig: StateConfigRecord[] = [
@@ -149,8 +147,7 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
 
   Start() {
     super.Start();
-
-    this.hitPoints = this.config.minHp + Math.floor((this.config.maxHp - this.config.minHp) * Math.random());
+    this.seedHitPointsFromConfig();
     this.stateMachine = new StateMachine(Object.values(SlimeBlueState), this.slimeBlueConfig);
     this.stateMachine.changeState(SlimeBlueState.Idle);    
   }
@@ -163,7 +160,7 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
     if (this.isDead)
       return
 
-    this.hitPoints -= damage;
+    this.applyDamage(damage);
     super.npcHit(hitPos, hitNormal, damage);
     this.stateMachine?.changeState(SlimeBlueState.Hit);
   }
@@ -187,6 +184,7 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
     }
   }
 
+
   private resolveAttackOnPlayer(player: Player) {
     // If the player is still in range after the attack delay, apply damage
     if (player.position.get().distanceSquared(this.entity.position.get()) < Math.pow(this.config.maxAttachReach, 2)) {
@@ -196,5 +194,12 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
       //PlayerManager.instance.hitPlayer(player, damage, this.entity.position.get());
     }
   }
+
+  protected override onHitPointsChanged(snapshot: NpcHealthSnapshot): void {
+    super.onHitPointsChanged(snapshot);  
+    // TODO: 갱신 예정 NPC 히트 포인트 변경 시 갱신
+    // 하위의 SlimeHUD 컴포넌트에서 갱신 처리    
+  }
 }
 Component.register(SlimeBlueBrain);
+

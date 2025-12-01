@@ -7,9 +7,9 @@
 
 import { AudioGizmo, Component, Entity, Player, PropTypes, Vec3 } from "horizon/core";
 import { LootSystem } from "LootSystem";
-import { NpcAgent, NpcAnimation, NpcMovementSpeed } from "NpcAgent";
-import { PlayerManager } from "PlayerManager";
+import { NpcAgent, NpcAnimation, NpcHealthSnapshot, NpcMovementSpeed } from "NpcAgent";
 import { NextStateEdges, StateCallbackConfig, StateCallbacks, StateConfigRecord, StateMachine } from "StateMachine";
+import { SlimeHUD } from "SlimeHUD";
 
 enum SlimeKingState {
   Idle = "Idle",
@@ -31,8 +31,6 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     hitSfx: { type: PropTypes.Entity },
     deathSfx: { type: PropTypes.Entity },
   };
-
-  hitPoints: number = 1;
 
   // START State Machine Config *********************************************
   slimeKingConfig: StateConfigRecord[] = [
@@ -150,7 +148,7 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
   Start() {
     super.Start();
 
-    this.hitPoints = this.config.minHp + Math.floor((this.config.maxHp - this.config.minHp) * Math.random());
+    this.seedHitPointsFromConfig();
     this.stateMachine = new StateMachine(Object.values(SlimeKingState), this.slimeKingConfig);
     this.stateMachine.changeState(SlimeKingState.Idle);    
   }
@@ -163,7 +161,7 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     if (this.isDead)
       return
 
-    this.hitPoints -= damage;
+    this.applyDamage(damage);
     super.npcHit(hitPos, hitNormal, damage);
     this.stateMachine?.changeState(SlimeKingState.Hit);
   }
@@ -199,5 +197,17 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
 
     }
   }
+  protected override onHitPointsChanged(snapshot: NpcHealthSnapshot): void {
+    super.onHitPointsChanged(snapshot);  
+    // TODO: 갱신 예정 NPC 히트 포인트 변경 시 갱신
+    // 하위의 SlimeHUD 컴포넌트에서 갱신 처리    
+  }
+
 }
 Component.register(SlimeKingBrain);
+
+
+
+
+
+
