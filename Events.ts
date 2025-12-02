@@ -39,6 +39,8 @@ export const Events = {
   playerDataUpdate: new NetworkEvent<{ammo : number, hp: number}>('playerDataUpdate'),
   playerAmmoUpdate: new NetworkEvent<{player: Player, ammo : number}>('playerAmmoUpdate'),
   playerHpUpdate: new NetworkEvent<{player: Player, hp : number}>('playerHpUpdate'),
+  playerLevelUp: new NetworkEvent<{player: Player, level: number, xp: number}>('playerLevelUp'),
+  playerShowResults: new NetworkEvent<{player: Player, score: number, placement?: number}>('playerShowResults'),
   playerModeChanged: new NetworkEvent<{ mode: string }>('playerModeChanged'),
   playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),
 };

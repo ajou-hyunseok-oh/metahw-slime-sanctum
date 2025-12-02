@@ -1,60 +1,96 @@
-import {CodeBlockEvents, Component, NetworkEvent, Player} from 'horizon/core';
-import { NoesisGizmo } from 'horizon/noesis';
-
-/**
- * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
- */
-const TitlePageViewEvent = new NetworkEvent<{greeting: string}>("TitlePageViewEvent");
+import { CodeBlockEvents, Component, Player } from 'horizon/core';
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
  * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
  */
 class TitlePageView extends Component<typeof TitlePageView> {
+  private hasDismissedLocalUi = false;
+  private minDisplayComplete = false;
+  private playerReady = false;
+  private playerReadyPollId: number | null = null;
 
   start() {
-    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
-      this.startServer();
-    } else {
-      this.startClient();
+    this.registerEntryLogging();
+    this.initializeDisplayFlow();
+  }
+
+  private registerEntryLogging() {
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
+      try {
+        console.log('[TitlePageView] Player entered world:', player.name.get());
+      } catch {
+        console.log('[TitlePageView] Player entered world:', player.id);
+      }
+    });
+  }
+
+  private initializeDisplayFlow() {
+    this.async.setTimeout(() => {
+      this.minDisplayComplete = true;
+      this.tryDismiss();
+    }, 3000);
+
+    this.startPollingForPlayerReady();
+  }
+
+  private startPollingForPlayerReady() {
+    if (this.playerReadyPollId !== null) {
+      return;
+    }
+
+    this.playerReadyPollId = this.async.setInterval(() => {
+      if (this.checkPlayerLoaded()) {
+        this.playerReady = true;
+        this.stopPlayerReadyPoll();
+        this.tryDismiss();
+      }
+    }, 250);
+  }
+
+  private stopPlayerReadyPoll() {
+    if (this.playerReadyPollId === null) {
+      return;
+    }
+
+    this.async.clearInterval(this.playerReadyPollId);
+    this.playerReadyPollId = null;
+  }
+
+  private checkPlayerLoaded(): boolean {
+    try {
+      const localPlayer = this.world.getLocalPlayer();
+      if (!localPlayer) {
+        return false;
+      }
+      return localPlayer.isValidReference.get();
+    } catch {
+      return false;
     }
   }
 
-  private startServer() {
-    // Noesis dataContext can't be directly controlled from the server
-    // but server can send events to the clients so that they would update their dataContexts accordingly
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
-      this.sendNetworkEvent(player, TitlePageViewEvent, {greeting: `Welcome ${player.name.get()}`});
-    });
+  private tryDismiss() {
+    if (this.hasDismissedLocalUi) {
+      return;
+    }
+
+    if (!this.minDisplayComplete || !this.playerReady) {
+      return;
+    }
+
+    this.dismissLocalUi();
   }
 
-  private startClient() {
-    const dataContext = {
-      label: "NoesisGUI",
-      nested: {
-        text: "Hello World",
-      },
-      items: [
-        {
-          label: "Item 1",
-        },
-        {
-          label: "Item 2",
-        },
-      ],
-      command: () => {
-        console.log("Command invoked");
-        dataContext.nested.text = "Boom!";
-      }
-    };
-    this.entity.as(NoesisGizmo).dataContext = dataContext;
-    // After a dataContext object is attached to a Noesis gizmo, it's automatically tracked for changes
-    // so simply updating it will automatically update the UI.
-    this.connectNetworkEvent(this.world.getLocalPlayer(), TitlePageViewEvent, data => {
-      console.log('NoesisUI: OnEvent', data);
-      dataContext.label = data.greeting;
-    });
+  private dismissLocalUi() {
+    if (this.hasDismissedLocalUi) {
+      return;
+    }
+
+    this.hasDismissedLocalUi = true;
+    this.stopPlayerReadyPoll();
+    this.entity.visible.set(false);
+    this.entity.collidable.set(false);
+    this.entity.simulated.set(false);
   }
 }
 
