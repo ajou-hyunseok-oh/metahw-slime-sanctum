@@ -12,6 +12,7 @@ import { Events } from 'Events';
 import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 import { PlayerPersistentVariables, PersistentVariables } from 'PlayerPersistentVariables';
+import { MatchStateManager } from 'MatchStateManager';
 
 export enum PlayerMode {
   Lobby = "Lobby",
@@ -58,6 +59,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   public gamePlayers: GamePlayers = new GamePlayers();
   private playerPersistentVariables: PlayerPersistentVariables | undefined;
   private playerPersistentCache = new Map<number, PersistentVariables>();
+  private matchStateManager: MatchStateManager | undefined;
 
   Awake() {
     PlayerManager.instance = this;
@@ -66,6 +68,10 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   Start() {
     this.weaponSelector = WeaponSelector.Instance ?? undefined;
     this.playerPersistentVariables = new PlayerPersistentVariables(this.world);
+    this.matchStateManager = MatchStateManager.instance;
+    if (!this.matchStateManager) {
+      console.warn('[PlayerManager] MatchStateManager 인스턴스를 찾을 수 없습니다. 매치 상태 추적이 비활성화됩니다.');
+    }
     this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, this.onPlayerEnterWorld.bind(this));
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerExitWorld, this.onPlayerExitWorld.bind(this));
@@ -100,9 +106,11 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     switch (mode) {
       case PlayerMode.Lobby:
         console.log(`[PlayerManager] ${player.name.get()} -> Lobby`);
+        this.matchStateManager?.exitMatch(player);
         break;
       case PlayerMode.Match:
         console.log(`[PlayerManager] ${player.name.get()} -> Match`);
+        this.matchStateManager?.enterMatch(player);
         this.grantMatchStartingWeapon(player);
         break;
     }
@@ -156,6 +164,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
       console.log(`[PlayerManager] Saved persistent stats for ${player.name.get()}`);
       this.playerPersistentCache.delete(player.id);
     }
+    this.matchStateManager?.exitMatch(player);
   }
 
   private onPlayerPersistentStatsRequest(data: { playerId: number }) {

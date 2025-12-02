@@ -50,6 +50,18 @@ export const Events = {
     bestWaves: number;
     killedSlimes: number;
   }>('playerPersistentStatsUpdate'),
+  matchStateRequest: new NetworkEvent<{ playerId: number }>('matchStateRequest'),
+  matchStateUpdate: new NetworkEvent<{
+    playerId: number;
+    hpCurrent: number;
+    hpMax: number;
+    defense: number;
+    meleeAttackLevel: number;
+    rangedAttackLevel: number;
+    magicAttackLevel: number;
+    slimeKills: number;
+    wavesSurvived: number;
+  }>('matchStateUpdate'),
 };
 
 export const WaveManagerNetworkEvents = {

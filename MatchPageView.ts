@@ -1,10 +1,27 @@
-import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
-import { NoesisGizmo } from 'horizon/noesis';
+// Copyright (c) 2025 Hyunseok Oh / TripleN Games Inc.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+//
+// Modified by Hyunseok Oh on December 02, 2025
 
-/**
- * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
- */
-const MatchPageViewEvent = new NetworkEvent<{greeting: string}>("MatchPageViewEvent");
+import { Component, NetworkEvent, Player } from 'horizon/core';
+import { NoesisGizmo } from 'horizon/noesis';
+import { Events } from 'Events';
+import { PlayerMode } from 'PlayerManager';
+import type { MatchStateUpdatePayload } from 'MatchStateManager';
+
+const playerModeChangedEvent = (Events as unknown as {
+  playerModeChanged: NetworkEvent<{ mode: string }>;
+}).playerModeChanged;
+
+const matchStateRequestEvent = (Events as unknown as {
+  matchStateRequest: NetworkEvent<{ playerId: number }>;
+}).matchStateRequest;
+
+const matchStateUpdateEvent = (Events as unknown as {
+  matchStateUpdate: NetworkEvent<MatchStateUpdatePayload>;
+}).matchStateUpdate;
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
@@ -13,48 +30,80 @@ const MatchPageViewEvent = new NetworkEvent<{greeting: string}>("MatchPageViewEv
 class MatchPageView extends Component<typeof MatchPageView> {
 
   start() {
-    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
-      this.startServer();
-    } else {
-      this.startClient();
+    if (!this.shouldRunLocally()) {
+      console.log('[MatchPageView] Server context detected; skipping client UI logic.');
+      return;
+    }
+
+    const localPlayer = this.world.getLocalPlayer();
+    if (!localPlayer) {
+      console.warn('[MatchPageView] No local player available.');
+      return;
+    }    
+
+    this.connectNetworkEvent(localPlayer, playerModeChangedEvent, payload => {
+      const isMatch = payload.mode === PlayerMode.Match;
+      this.setVisibility(isMatch, localPlayer);
+    });
+
+    this.connectNetworkEvent(localPlayer, matchStateUpdateEvent, payload => {
+      if (payload.playerId !== localPlayer.id) {
+        return;
+      }
+      this.onMatchStatsUpdated(payload);
+    });
+
+    this.setVisibility(false, localPlayer);
+  }
+
+  private setVisibility(visible: boolean, player: Player) {
+    this.entity.visible.set(visible);
+
+    if (visible) {
+      this.requestMatchStats(player);
     }
   }
 
-  private startServer() {
-    // Noesis dataContext can't be directly controlled from the server
-    // but server can send events to the clients so that they would update their dataContexts accordingly
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
-      this.sendNetworkEvent(player, MatchPageViewEvent, {greeting: `Welcome ${player.name.get()}`});
-    });
+  private requestMatchStats(player: Player) {
+    this.sendNetworkBroadcastEvent(matchStateRequestEvent, { playerId: player.id });
   }
 
-  private startClient() {
+  private onMatchStatsUpdated(stats: MatchStateUpdatePayload) {
     const dataContext = {
-      label: "NoesisGUI",
-      nested: {
-        text: "Hello World",
-      },
-      items: [
-        {
-          label: "Item 1",
-        },
-        {
-          label: "Item 2",
-        },
-      ],
-      command: () => {
-        console.log("Command invoked");
-        dataContext.nested.text = "Boom!";
-      }
+      CurrentHP: stats.hpCurrent,
+      MinHP: stats.hpMax,
+      MaxHP: stats.hpMax,
+      HPText: `${stats.hpCurrent}/${stats.hpMax}`,
+      MeleeLevel: stats.meleeAttackLevel,
+      RangedLevel: stats.rangedAttackLevel,
+      MagicLevel: stats.magicAttackLevel,
+      DefenceLevel: stats.defense,
     };
+
     this.entity.as(NoesisGizmo).dataContext = dataContext;
-    // After a dataContext object is attached to a Noesis gizmo, it's automatically tracked for changes
-    // so simply updating it will automatically update the UI.
-    this.connectNetworkEvent(this.world.getLocalPlayer(), MatchPageViewEvent, data => {
-      console.log('NoesisUI: OnEvent', data);
-      dataContext.label = data.greeting;
-    });
+  }
+
+  private createEmptyDataContext() {
+    return {
+      HpCurrent: 0,
+      HpMax: 0,
+      Defense: 0,
+      MeleeLevel: 0,
+      RangedLevel: 0,
+      MagicLevel: 0,
+      SlimeKills: 0,
+      WavesSurvived: 0,
+    };
+  }
+
+  private shouldRunLocally(): boolean {
+    try {
+      const localPlayer = this.world.getLocalPlayer();
+      const serverPlayer = this.world.getServerPlayer();
+      return !!localPlayer && !!serverPlayer && localPlayer.id !== serverPlayer.id;
+    } catch {
+      return false;
+    }
   }
 }
 
