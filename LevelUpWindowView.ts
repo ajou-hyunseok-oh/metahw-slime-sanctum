@@ -1,4 +1,11 @@
-import {CodeBlockEvents, Component, NetworkEvent, Player} from 'horizon/core';
+// Copyright (c) 2025 Hyunseok Oh / TripleN Games Inc.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+//
+// Modified by Hyunseok Oh on December 02, 2025
+
+import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
 
 /**
@@ -30,30 +37,12 @@ class LevelUpWindowView extends Component<typeof LevelUpWindowView> {
   }
 
   private startClient() {
-    const dataContext = {
-      label: "NoesisGUI",
-      nested: {
-        text: "Hello World",
-      },
-      items: [
-        {
-          label: "Item 1",
-        },
-        {
-          label: "Item 2",
-        },
-      ],
-      command: () => {
-        console.log("Command invoked");
-        dataContext.nested.text = "Boom!";
-      }
-    };
+    const dataContext = {};
     this.entity.as(NoesisGizmo).dataContext = dataContext;
     // After a dataContext object is attached to a Noesis gizmo, it's automatically tracked for changes
     // so simply updating it will automatically update the UI.
     this.connectNetworkEvent(this.world.getLocalPlayer(), LevelUpWindowViewEvent, data => {
-      console.log('NoesisUI: OnEvent', data);
-      dataContext.label = data.greeting;
+      console.log('NoesisUI: OnEvent', data);      
     });
   }
 }

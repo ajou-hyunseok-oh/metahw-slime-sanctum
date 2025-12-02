@@ -9,7 +9,7 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { GamePlayers } from 'GamePlayers';
 import { Events } from 'Events';
-import { Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
+import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 
 export enum PlayerMode {
@@ -55,6 +55,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   Start() {
     this.weaponSelector = WeaponSelector.Instance ?? undefined;
     this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, this.onPlayerEnterWorld.bind(this));
   }
 
   public setPlayerMode(player: Player, mode: PlayerMode) {
@@ -115,6 +116,10 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
   private notifyPlayerMode(player: Player, mode: PlayerMode) {
     this.sendNetworkEvent(player, playerModeChangedEvent, { mode });
+  }
+
+  private onPlayerEnterWorld(player: Player) {
+    this.setPlayerMode(player, PlayerMode.Lobby);
   }
 }
 Component.register(PlayerManager);

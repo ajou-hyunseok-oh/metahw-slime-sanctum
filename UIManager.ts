@@ -1,99 +1,180 @@
 import * as hz from 'horizon/core';
+import { Events } from 'Events';
+import { PlayerMode } from 'PlayerManager';
+
+const playerModeChangedEvent = (Events as unknown as {
+  playerModeChanged: hz.NetworkEvent<{ mode: string }>;
+}).playerModeChanged;
+
+const playerModeRequestEvent = (Events as unknown as {
+  playerModeRequest: hz.NetworkEvent<{ playerId: number }>;
+}).playerModeRequest;
+
+const playerLevelUpEvent = (Events as unknown as {
+  playerLevelUp: hz.NetworkEvent<{ player: hz.Player; level: number; xp: number }>;
+}).playerLevelUp;
+
+const playerDeathEvent = (Events as unknown as {
+  playerDeath: hz.NetworkEvent<{ player: hz.Player }>;
+}).playerDeath;
+
+const playerShowResultsEvent = (Events as unknown as {
+  playerShowResults: hz.NetworkEvent<{ player: hz.Player; score: number; placement?: number }>;
+}).playerShowResults;
 
 export enum UIState {
-  Title,
   Lobby,
-  Match,  
+  Match,
+}
+
+export enum UIPlayerEvent {
+  None,
   LevelUp,
-  Result,
+  Death,
+  Results,
 }
 
 export class UIManager extends hz.Component<typeof UIManager> {
   static propsDefinition = {
-    titlePageView: { type: hz.PropTypes.Entity },
     lobbyPageView: { type: hz.PropTypes.Entity },
-    matchPageView: { type: hz.PropTypes.Entity },    
-    levelUpWindowView: { type: hz.PropTypes.Entity },
-    resultWindowView: { type: hz.PropTypes.Entity },
+    matchPageView: { type: hz.PropTypes.Entity },
+    levelUpWindow: { type: hz.PropTypes.Entity },
+    deathWindow: { type: hz.PropTypes.Entity },
+    resultWindow: { type: hz.PropTypes.Entity },
   };
-
-  static instance: UIManager;
-  private static pendingCharacterLoaded = false;
-
-  private currentState: UIState = UIState.Title;
-  public get CurrentState() : UIState {
-    return this.currentState;
-  }
-  
-  public set CurrentState(value: UIState) {
-    this.currentState = value;
-
-    this.props.titlePageView?.visible.set(false);
-    this.props.lobbyPageView?.visible.set(false);
-    this.props.matchPageView?.visible.set(false);
-    this.props.levelUpWindowView?.visible.set(false);
-    this.props.resultWindowView?.visible.set(false);
-
-    switch (value) {
-      case UIState.Match:
-        this.props.matchPageView?.visible.set(true);
-        break;
-      case UIState.Lobby:
-        this.props.lobbyPageView?.visible.set(true);
-        break;
-      case UIState.Title:
-        this.props.titlePageView?.visible.set(true);
-        break;
-      case UIState.LevelUp:
-        this.props.levelUpWindowView?.visible.set(true);
-        break;
-      case UIState.Result:
-        this.props.resultWindowView?.visible.set(true);
-        break;
-    }
-  }
-
-  preStart() {
-    UIManager.instance = this;    
-  }
-
-  private minLifetimeComplete = false;
-  private playerLoaded = false;
-  private hasTransitioned = false;
+  private localPlayer: hz.Player | null = null;
+  private currentState: UIState = UIState.Lobby;
+  private activePlayerEvent: UIPlayerEvent = UIPlayerEvent.None;
 
   start() {
-    if (UIManager.pendingCharacterLoaded) {
-      this.handleCharacterLoaded();
-      UIManager.pendingCharacterLoaded = false;
-    }
-
-    this.async.setTimeout(() => {
-      this.minLifetimeComplete = true;
-      this.tryEnterLobby();
-    }, 3000);
-  }
-
-  public static notifyCharacterLoaded() {
-    if (UIManager.instance) {
-      UIManager.instance.handleCharacterLoaded();
+    if (!this.isLocalContext()) {
       return;
     }
 
-    UIManager.pendingCharacterLoaded = true;
-  }
-
-  private handleCharacterLoaded() {
-    this.playerLoaded = true;
-    this.tryEnterLobby();
-  }
-
-  private tryEnterLobby() {
-    if (this.hasTransitioned || !this.minLifetimeComplete || !this.playerLoaded) {
+    this.localPlayer = this.world.getLocalPlayer();
+    if (!this.localPlayer) {
+      console.warn('[UIManager] Local player reference is missing.');
       return;
     }
 
-    this.hasTransitioned = true;
-    this.CurrentState = UIState.Lobby;
+    this.initializeMainViews();
+    this.registerNetworkEventListeners();
+    this.requestInitialPlayerMode();
+  }
+
+  private initializeMainViews() {
+    this.applyUiState(this.currentState);
+    this.applyPlayerEvent(UIPlayerEvent.None);
+  }
+
+  private registerNetworkEventListeners() {
+    if (!this.localPlayer) {
+      return;
+    }
+
+    this.connectNetworkEvent(this.localPlayer, playerModeChangedEvent, ({ mode }) => {
+      this.handlePlayerModeChanged(mode);
+    });
+
+    this.connectNetworkEvent(this.localPlayer, playerLevelUpEvent, ({ player }) => {
+      if (this.isLocalPlayer(player)) {
+        this.applyPlayerEvent(UIPlayerEvent.LevelUp);
+      }
+    });
+
+    this.connectNetworkEvent(this.localPlayer, playerDeathEvent, ({ player }) => {
+      if (this.isLocalPlayer(player)) {
+        this.applyPlayerEvent(UIPlayerEvent.Death);
+      }
+    });
+
+    this.connectNetworkEvent(this.localPlayer, playerShowResultsEvent, ({ player }) => {
+      if (this.isLocalPlayer(player)) {
+        this.applyPlayerEvent(UIPlayerEvent.Results);
+      }
+    });
+  }
+
+  private requestInitialPlayerMode() {
+    if (!this.localPlayer) {
+      return;
+    }
+
+    this.sendNetworkBroadcastEvent(playerModeRequestEvent, { playerId: this.localPlayer.id });
+  }
+
+  private handlePlayerModeChanged(mode: string) {
+    if (mode === PlayerMode.Match) {
+      this.currentState = UIState.Match;
+    } else {
+      this.currentState = UIState.Lobby;
+    }
+
+    this.applyUiState(this.currentState);
+
+    if (this.currentState === UIState.Lobby) {
+      this.applyPlayerEvent(UIPlayerEvent.None);
+    }
+  }
+
+  private applyUiState(state: UIState) {
+    const lobbyView = this.props.lobbyPageView;
+    const matchView = this.props.matchPageView;
+
+    lobbyView?.visible.set(state === UIState.Lobby);
+    matchView?.visible.set(state === UIState.Match);
+  }
+
+  private applyPlayerEvent(eventType: UIPlayerEvent) {
+    if (this.activePlayerEvent === eventType) {
+      return;
+    }
+
+    this.hideActivePlayerEvent();
+    this.activePlayerEvent = eventType;
+    this.showPlayerEventWindow(eventType);
+  }
+
+  private hideActivePlayerEvent() {
+    this.togglePlayerEventWindow(this.activePlayerEvent, false);
+    this.activePlayerEvent = UIPlayerEvent.None;
+  }
+
+  private showPlayerEventWindow(eventType: UIPlayerEvent) {
+    this.togglePlayerEventWindow(eventType, true);
+  }
+
+  private togglePlayerEventWindow(eventType: UIPlayerEvent, isVisible: boolean) {
+    const target = this.getEventWindowEntity(eventType);
+    target?.visible.set(isVisible);
+  }
+
+  private getEventWindowEntity(eventType: UIPlayerEvent): hz.Entity | undefined {
+    switch (eventType) {
+      case UIPlayerEvent.LevelUp:
+        return this.props.levelUpWindow;
+      case UIPlayerEvent.Death:
+        return this.props.deathWindow;
+      case UIPlayerEvent.Results:
+        return this.props.resultWindow;
+      default:
+        return undefined;
+    }
+  }
+
+  private isLocalPlayer(player: hz.Player): boolean {
+    return !!this.localPlayer && player.id === this.localPlayer.id;
+  }
+
+  private isLocalContext(): boolean {
+    try {
+      const local = this.world.getLocalPlayer();
+      const server = this.world.getServerPlayer();
+      return local?.id !== server?.id;
+    } catch {
+      return false;
+    }
   }
 }
+
 hz.Component.register(UIManager);
