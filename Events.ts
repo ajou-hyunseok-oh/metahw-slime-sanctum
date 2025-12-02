@@ -43,6 +43,13 @@ export const Events = {
   playerShowResults: new NetworkEvent<{player: Player, score: number, placement?: number}>('playerShowResults'),
   playerModeChanged: new NetworkEvent<{ mode: string }>('playerModeChanged'),
   playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),
+  playerPersistentStatsRequest: new NetworkEvent<{ playerId: number }>('playerPersistentStatsRequest'),
+  playerPersistentStatsUpdate: new NetworkEvent<{
+    coins: number;
+    gems: number;
+    bestWaves: number;
+    killedSlimes: number;
+  }>('playerPersistentStatsUpdate'),
 };
 
 export const WaveManagerNetworkEvents = {
