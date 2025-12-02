@@ -18,6 +18,14 @@ class TitlePageView extends Component<typeof TitlePageView> {
   private playerReadyPollId: number | null = null;
 
   start() {
+    const localPlayer = this.world.getLocalPlayer();
+    const serverPlayer = this.world.getServerPlayer();
+
+    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
+      console.log('[TitlePageView] Server context detected; skipping client UI logic.');
+      return;
+    }
+
     this.registerEntryLogging();
     this.initializeDisplayFlow();
   }
