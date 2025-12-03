@@ -6,10 +6,9 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, Player, Quaternion, Vec3 } from 'horizon/core';
 
-export interface IAllocatable
-{
-  onAllocate(position : Vec3, rotation : Quaternion, owner : Player | null) : void;
-  onFree() : void;
+export interface IAllocatable {
+  onAllocate(position: Vec3, rotation: Quaternion, owner?: Player | null): void;
+  onFree(): void;
 }
 
 export class ObjectPool extends Behaviour<typeof ObjectPool> {
@@ -54,6 +53,15 @@ export class ObjectPool extends Behaviour<typeof ObjectPool> {
 
     var allocatable = BehaviourFinder.GetBehaviour(entity) as unknown as IAllocatable;
     allocatable?.onFree();
+  }
+
+  public removeEntity(entity: Entity | undefined | null) {
+    if (!entity) {
+      return;
+    }
+
+    this.allocatedEntities.delete(entity);
+    this.freeEntities.delete(entity);
   }
 
   public has(entity : Entity) {

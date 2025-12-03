@@ -136,11 +136,9 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
           this.props.deathSfx?.as(AudioGizmo)?.play();
           if (this.config.lootTable != undefined) {
             LootSystem.instance?.dropLoot(this.config.lootTable, this.entity.position.get(), this.entity.rotation.get());
-            this.animate(NpcAnimation.Death);
-            this.async.setTimeout(() => {
-              this.world.deleteAsset(this.entity)
-            }, 5000);
           }
+          this.animate(NpcAnimation.Death);
+          this.recycleSelf(5000);
         })
       ]
     ),
@@ -203,6 +201,10 @@ class SlimeBlueBrain extends NpcAgent<typeof SlimeBlueBrain> {
     super.onHitPointsChanged(snapshot);  
     // TODO: 갱신 예정 NPC 히트 포인트 변경 시 갱신
     // 하위의 SlimeHUD 컴포넌트에서 갱신 처리    
+  }
+
+  protected override onRevivedFromPool(): void {
+    this.stateMachine?.changeState(SlimeBlueState.Idle);
   }
 
   private playHitVfx(hitPos: Vec3) {

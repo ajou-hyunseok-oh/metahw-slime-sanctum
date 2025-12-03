@@ -54,16 +54,14 @@ export class LevelController extends Behaviour<typeof LevelController> {
     }
 
 
-    for (let i = 0; i < this.fixedSpawnEntities.length; i++) {
-      const fixedSpawnEntity = this.fixedSpawnEntities[i];
-      const objectPool = this.props.objectPool;
-      if (!objectPool) {
-        console.error("[LevelController] ObjectPool entity prop is not assigned.");
-        return;
-      }
-      
-      wavePlayer.spawnFixedSlimes(objectPool, fixedSpawnEntity, i);
-    }    
+    const objectPool = this.props.objectPool;
+    if (!objectPool) {
+      console.error("[LevelController] ObjectPool entity prop is not assigned.");
+      return;
+    }
+
+    // 기존 고정 스폰 로직은 제거하고, 추후 구역별 알고리즘 실행 시 사용하도록 풀만 확보
+    // 현재는 WavePlayer에서 별도 메서드로 관리하므로 여기서는 아무 것도 하지 않는다.
   }
 }
 

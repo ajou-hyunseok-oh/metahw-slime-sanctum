@@ -6,10 +6,11 @@
 import { Behaviour } from "Behaviour";
 import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
-import { Color, Component, Player, PropTypes, Vec3 } from "horizon/core";
+import { Color, Component, Player, PropTypes, Quaternion, Vec3 } from "horizon/core";
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
 import { NpcConfigStore } from "NpcConfigStore";
 import { StateMachine } from "StateMachine";
+import { IAllocatable, ObjectPool } from "ObjectPool";
 
 export enum NpcAnimation {
   Idle = "Idle",
@@ -38,7 +39,7 @@ export interface NpcHealthSnapshot {
   max: number;
 }
 
-export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcAgent {
+export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcAgent, IAllocatable {
   // Editable Properties
   static propsDefinition = {
     agentFPS: { type: PropTypes.Number, default: 4 },
@@ -89,6 +90,9 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
   protected hitPoints: number = 1;
   protected maxHitPoints: number = 1;
   private hpSubscribers: Set<(snapshot: NpcHealthSnapshot) => void> = new Set();
+  private owningPool: ObjectPool | null = null;
+  private readonly poolRestingPosition: Vec3 = new Vec3(0, -9999, 0);
+  private pendingRecycleHandle: number | null = null;
 
   Start() {    
     this.resetAllAnimationParameters();
@@ -111,6 +115,69 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.connectNetworkEvent(this.entity, Events.projectileHit, this.bulletHit.bind(this));
     this.connectNetworkEvent(this.props.collider!, Events.meleeHit, this.onMeleeHit.bind(this));
     this.connectNetworkEvent(this.entity, Events.meleeHit, this.onMeleeHit.bind(this));
+  }
+
+  public assignOwningPool(pool: ObjectPool | null) {
+    this.owningPool = pool;
+  }
+
+  public prepareForPoolStorage() {
+    this.moveEntityToPoolRestingState();
+  }
+
+  public onAllocate(position: Vec3, rotation: Quaternion, owner?: Player | null) {
+    if (this.pendingRecycleHandle !== null) {
+      this.async.clearTimeout(this.pendingRecycleHandle);
+      this.pendingRecycleHandle = null;
+    }
+
+    this.entity.position.set(position);
+    this.entity.rotation.set(rotation);
+    this.props.collider?.collidable.set(true);
+    this.navAgent?.isImmobile.set(false);
+    this.setNavigationFrozen(false);
+    this.isDead = false;
+    this.targetPlayer = owner ?? undefined;
+    this.seedHitPointsFromConfig();
+    this.onRevivedFromPool();
+  }
+
+  public onFree() {
+    this.moveEntityToPoolRestingState();
+    this.onReturnedToPool();
+  }
+
+  protected recycleSelf(delayMs: number = 0) {
+    const release = () => {
+      this.pendingRecycleHandle = null;
+      if (this.owningPool) {
+        this.owningPool.free(this.entity);
+      } else {
+        this.world.deleteAsset(this.entity);
+      }
+    };
+
+    if (delayMs <= 0) {
+      release();
+    } else {
+      this.pendingRecycleHandle = this.async.setTimeout(release, delayMs);
+    }
+  }
+
+  protected onRevivedFromPool(): void {
+    // default no-op; subclasses can override
+  }
+
+  protected onReturnedToPool(): void {
+    // default no-op; subclasses can override
+  }
+
+  private moveEntityToPoolRestingState() {
+    this.entity.position.set(this.poolRestingPosition);
+    this.props.collider?.collidable.set(false);
+    this.navAgent?.isImmobile.set(true);
+    this.setNavigationFrozen(true);
+    this.targetPlayer = undefined;
   }
 
   Update(deltaTime: number) {
