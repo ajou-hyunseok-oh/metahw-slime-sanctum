@@ -47,7 +47,14 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     model: { type: PropTypes.Entity },
     configName: { type: PropTypes.String, default: "default" }    
   };
+
+  private static readonly activeAgents: Set<NpcAgent<any>> = new Set();
   
+  protected override Awake(): void {
+    super.Awake();
+    NpcAgent.activeAgents.add(this);
+  }
+
   private navMesh?: INavMesh | null = null;
   private navAgent?: NavMeshAgent | null = null;
   private frameTimer: number = 0.0;
@@ -130,7 +137,12 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.updateAutoAcquireTarget(deltaTime);
   }
 
+  public static getActiveAgents(): NpcAgent<any>[] {
+    return Array.from(NpcAgent.activeAgents);
+  }
+
   protected Dispose(): void {
+    NpcAgent.activeAgents.delete(this);
     this.hpSubscribers.clear();
     super.Dispose();
   }
