@@ -21,7 +21,7 @@ export const Events = {
   gunRequestAmmoResponse: new NetworkEvent<{ammoCount : number}>('gunRequestAmmoResponse'),
 
   // Axe events
-  axeHit: new NetworkEvent<{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player}>('axeHit'),
+  meleeHit: new NetworkEvent<{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number}>('meleeHit'),
 
   // Monster Events
   playerHit : new NetworkEvent<{player: Player, damage: number, damageOrigin : Vec3}>('PlayerHit'),

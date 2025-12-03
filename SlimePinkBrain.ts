@@ -5,7 +5,7 @@
 //
 // Modified by Hyunseok Oh on November 30, 2025
 
-import { AudioGizmo, Component, Entity, Player, PropTypes, Vec3 } from "horizon/core";
+import { AudioGizmo, Component, Entity, ParticleGizmo, Player, PropTypes, Vec3 } from "horizon/core";
 import { LootSystem } from "LootSystem";
 import { NpcAgent, NpcAnimation, NpcHealthSnapshot, NpcMovementSpeed } from "NpcAgent";
 import { NextStateEdges, StateCallbackConfig, StateCallbacks, StateConfigRecord, StateMachine } from "StateMachine";
@@ -30,6 +30,8 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     attackHitSfx: { type: PropTypes.Entity },
     hitSfx: { type: PropTypes.Entity },
     deathSfx: { type: PropTypes.Entity },
+    hitVfx: { type: PropTypes.Entity },
+    deathVfx: { type: PropTypes.Entity },
   };
 
   startLocation!: Vec3;  
@@ -165,6 +167,8 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
       return
 
     this.applyDamage(damage);
+    this.playHitVfx(hitPos);
+    console.log(`[SlimePinkBrain] HP=${this.getCurrentHitPoints()}/${this.getMaxHitPoints()} (-${damage})`);
     super.npcHit(hitPos, hitNormal, damage);
     this.stateMachine?.changeState(SlimePinkState.Hit);
   }
@@ -203,6 +207,18 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     super.onHitPointsChanged(snapshot);  
     // TODO: 갱신 예정 NPC 히트 포인트 변경 시 갱신
     // 하위의 SlimeHUD 컴포넌트에서 갱신 처리    
+  }
+
+  private playHitVfx(hitPos: Vec3) {
+    this.playVfxEntity(this.props.hitVfx, hitPos);
+  }
+
+  private playVfxEntity(vfxEntity: Entity | undefined, position: Vec3) {
+    if (!vfxEntity) {
+      return;
+    }
+    vfxEntity.position.set(position);
+    vfxEntity.as(ParticleGizmo)?.play();
   }
 }
 Component.register(SlimePinkBrain);

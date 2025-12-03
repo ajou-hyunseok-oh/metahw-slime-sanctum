@@ -2,12 +2,25 @@ import * as hz from 'horizon/core';
 import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
 import { NpcAgent } from 'NpcAgent';
+import { MatchStateManager } from 'MatchStateManager';
 import { meleeAttackRequestEvent, MeleeAttackRequestPayload, MeleeAttackRequestParams } from 'MeleeWeaponEvents';
 
 type AnyNpcAgent = NpcAgent<any>;
 
 const DEG_TO_RAD = Math.PI / 180;
 const EPSILON = 1e-4;
+const MELEE_DAMAGE_TABLE: { [level: number]: number } = {
+  1: 5,
+  2: 6,
+  3: 7,
+  4: 8,
+  5: 9,
+  6: 10,
+  7: 11,
+  8: 12,
+  9: 13,
+  10: 14,
+};
 
 class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
   start() {
@@ -29,6 +42,7 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
 
   private resolveMeleeSwing(player: hz.Player, payload: MeleeAttackRequestPayload) {
     const params = this.normalizeParams(payload.params);
+    const meleeDamage = this.getMeleeDamageForPlayer(player);
     if (params.range <= 0 || params.maxTargets <= 0) {
       return;
     }
@@ -71,19 +85,20 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
         continue;
       }
 
-      this.emitHitEvent(agent, player, targetPosition, deltaX, deltaY, deltaZ);
+      this.emitHitEvent(agent, player, targetPosition, deltaX, deltaY, deltaZ, meleeDamage);
       appliedHits += 1;
     }
 
     console.log(`[MeleeWeaponServer] player=${player.id} weapon=${payload.weaponEntityId} hits=${appliedHits}`);
   }
 
-  private emitHitEvent(agent: AnyNpcAgent, player: hz.Player, targetPosition: hz.Vec3, deltaX: number, deltaY: number, deltaZ: number) {
+  private emitHitEvent(agent: AnyNpcAgent, player: hz.Player, targetPosition: hz.Vec3, deltaX: number, deltaY: number, deltaZ: number, damage: number) {
     const hitNormal = this.buildHitNormal(deltaX, deltaY, deltaZ);
-    this.sendNetworkEvent(agent.entity, Events.axeHit, {
+    this.sendNetworkEvent(agent.entity, Events.meleeHit, {
       hitPos: targetPosition,
       hitNormal,
       fromPlayer: player,
+      damage,
     });
   }
 
@@ -133,6 +148,25 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
     const verticalTolerance = Math.max(0, params.verticalTolerance);
     const maxTargets = Math.max(1, Math.floor(params.maxTargets));
     return { range, arc, verticalTolerance, maxTargets };
+  }
+
+  private getMeleeDamageForPlayer(player: hz.Player): number {
+    const stats = MatchStateManager.instance?.getStats(player);
+    const level = stats?.meleeAttackLevel ?? 1;
+    return this.getMeleeDamageForLevel(level);
+  }
+
+  private getMeleeDamageForLevel(level: number): number {
+    const normalizedLevel = Math.max(1, Math.floor(level));
+    if (MELEE_DAMAGE_TABLE[normalizedLevel] !== undefined) {
+      return MELEE_DAMAGE_TABLE[normalizedLevel];
+    }
+
+    const definedLevels = Object.keys(MELEE_DAMAGE_TABLE).map((key) => Number(key));
+    const maxDefinedLevel = Math.max(...definedLevels);
+    const maxDefinedDamage = MELEE_DAMAGE_TABLE[maxDefinedLevel];
+    const extraLevels = normalizedLevel - maxDefinedLevel;
+    return maxDefinedDamage + extraLevels;
   }
 
   private isServerContext(): boolean {

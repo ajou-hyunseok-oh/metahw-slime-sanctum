@@ -109,8 +109,8 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
 
     this.connectNetworkEvent(this.props.collider!, Events.projectileHit, this.bulletHit.bind(this));
     this.connectNetworkEvent(this.entity, Events.projectileHit, this.bulletHit.bind(this));
-    this.connectNetworkEvent(this.props.collider!, Events.axeHit, this.axeHit.bind(this));
-    this.connectNetworkEvent(this.entity, Events.axeHit, this.axeHit.bind(this));
+    this.connectNetworkEvent(this.props.collider!, Events.meleeHit, this.onMeleeHit.bind(this));
+    this.connectNetworkEvent(this.entity, Events.meleeHit, this.onMeleeHit.bind(this));
   }
 
   Update(deltaTime: number) {
@@ -212,10 +212,13 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
   }
 
-  private axeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player }) {
-    var axeDamage = this.config.minAxeDamage + Math.floor((this.config.maxAxeDamage - this.config.minAxeDamage) * Math.random());
+  private onMeleeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number }) {
+    const clampedDamage = Math.max(0, Math.floor(data.damage));
+    if (clampedDamage <= 0) {
+      return;
+    }
 
-    this.npcHit(data.hitPos, data.hitNormal, axeDamage);
+    this.npcHit(data.hitPos, data.hitNormal, clampedDamage);
     this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
   }
 
