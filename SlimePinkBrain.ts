@@ -136,10 +136,12 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
       [
         new StateCallbackConfig(StateCallbacks.OnEnter, () => {
           this.props.deathSfx?.as(AudioGizmo)?.play();
+          this.playDeathVfx();
           if (this.config.lootTable != undefined) {
             LootSystem.instance?.dropLoot(this.config.lootTable, this.entity.position.get(), this.entity.rotation.get());
           }
           this.animate(NpcAnimation.Death);
+          this.setModelVisibility(false);
           this.recycleSelf(5000);
         })
       ]
@@ -208,6 +210,8 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
   }
 
   protected override onRevivedFromPool(): void {
+    super.onRevivedFromPool();
+    this.setModelVisibility(true);
     this.stateMachine?.changeState(SlimePinkState.Idle);
   }
 
@@ -221,6 +225,11 @@ class SlimePinkBrain extends NpcAgent<typeof SlimePinkBrain> {
     }
     vfxEntity.position.set(position);
     vfxEntity.as(ParticleGizmo)?.play();
+  }
+
+  private playDeathVfx() {
+    const position = this.entity.position.get();
+    this.playVfxEntity(this.props.deathVfx, position);
   }
 }
 Component.register(SlimePinkBrain);

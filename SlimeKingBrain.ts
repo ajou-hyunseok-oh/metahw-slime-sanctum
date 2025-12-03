@@ -134,6 +134,7 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
       [
         new StateCallbackConfig(StateCallbacks.OnEnter, () => {
           this.props.deathSfx?.as(AudioGizmo)?.play();
+          this.playDeathVfx();
           if (this.config.lootTable != undefined) {
             LootSystem.instance?.dropLoot(this.config.lootTable, this.entity.position.get(), this.entity.rotation.get());
           }
@@ -205,10 +206,6 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     // 하위의 SlimeHUD 컴포넌트에서 갱신 처리    
   }
 
-  protected override onRevivedFromPool(): void {
-    this.stateMachine?.changeState(SlimeKingState.Idle);
-  }
-
   private playHitVfx(hitPos: Vec3) {
     this.playVfxEntity(this.props.hitVfx, hitPos);
   }
@@ -221,6 +218,16 @@ class SlimeKingBrain extends NpcAgent<typeof SlimeKingBrain> {
     vfxEntity.as(ParticleGizmo)?.play();
   }
 
+  private playDeathVfx() {
+    const position = this.entity.position.get();
+    this.playVfxEntity(this.props.deathVfx, position);
+  }
+
+  protected override onRevivedFromPool(): void {
+    super.onRevivedFromPool();
+    this.setModelVisibility(true);
+    this.stateMachine?.changeState(SlimeKingState.Idle);
+  }
 }
 Component.register(SlimeKingBrain);
 

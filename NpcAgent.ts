@@ -136,6 +136,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.props.collider?.collidable.set(true);
     this.navAgent?.isImmobile.set(false);
     this.setNavigationFrozen(false);
+    this.setModelVisibility(true);
     this.isDead = false;
     this.targetPlayer = owner ?? undefined;
     this.seedHitPointsFromConfig();
@@ -151,6 +152,7 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     const release = () => {
       this.pendingRecycleHandle = null;
       if (this.owningPool) {
+        this.setModelVisibility(false);
         this.owningPool.free(this.entity);
       } else {
         this.world.deleteAsset(this.entity);
@@ -177,7 +179,13 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     this.props.collider?.collidable.set(false);
     this.navAgent?.isImmobile.set(true);
     this.setNavigationFrozen(true);
+    this.setModelVisibility(false);
     this.targetPlayer = undefined;
+  }
+
+  protected setModelVisibility(visible: boolean) {
+    const modelEntity = this.props.model ?? this.entity;
+    modelEntity?.visible?.set?.(visible);
   }
 
   Update(deltaTime: number) {
