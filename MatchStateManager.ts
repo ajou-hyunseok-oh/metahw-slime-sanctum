@@ -31,7 +31,8 @@ const matchStateUpdateEvent = (Events as unknown as {
 }).matchStateUpdate;
 
 /**
- * 서버에서 플레이어별 매치 진행 상태(HP, 능력치, 진행 기록 등)를 관리하는 관리 컴포넌트
+ * 서버에서 플레이어별 매치 진행 상태(HP, 능력치, 진행 기록 등)를 일원화해 관리한다.
+ * HP/공격 스탯은 반드시 이 매니저를 경유해 갱신해야 다른 시스템과 정합성이 보장된다.
  */
 export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   static propsDefinition = {
@@ -97,9 +98,45 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     };
     merged.hpMax = merged.hpMax <= 0 ? 1 : merged.hpMax;
     merged.hpCurrent = this.clamp(merged.hpCurrent, 0, merged.hpMax);
+    merged.defense = Math.max(0, merged.defense);
+    merged.meleeAttackLevel = this.normalizeCombatLevel(merged.meleeAttackLevel);
+    merged.rangedAttackLevel = this.normalizeCombatLevel(merged.rangedAttackLevel);
+    merged.magicAttackLevel = this.normalizeCombatLevel(merged.magicAttackLevel);
     this.playerStates.set(player.id, merged);
     this.emitStateUpdate(player, merged);
     return merged;
+  }
+
+  /**
+   * HP(현재/최대)를 한 번에 조정한다.
+   */
+  public setHp(
+    player: Player,
+    values: { hpCurrent?: number; hpMax?: number }
+  ): MatchVariables {
+    const patch: Partial<MatchVariables> = {};
+    if (values.hpMax !== undefined) {
+      patch.hpMax = values.hpMax;
+    }
+    if (values.hpCurrent !== undefined) {
+      patch.hpCurrent = values.hpCurrent;
+    }
+    return this.patchStats(player, patch);
+  }
+
+  /**
+   * 공격 관련 수치를 조정한다.
+   */
+  public setCombatAttributes(
+    player: Player,
+    attributes: Partial<
+      Pick<
+        MatchVariables,
+        'defense' | 'meleeAttackLevel' | 'rangedAttackLevel' | 'magicAttackLevel'
+      >
+    >
+  ): MatchVariables {
+    return this.patchStats(player, attributes);
   }
 
   public adjustHp(player: Player, delta: number): MatchVariables {
@@ -156,6 +193,10 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
       0,
       initial.hpMax
     );
+    initial.defense = Math.max(0, initial.defense);
+    initial.meleeAttackLevel = this.normalizeCombatLevel(initial.meleeAttackLevel);
+    initial.rangedAttackLevel = this.normalizeCombatLevel(initial.rangedAttackLevel);
+    initial.magicAttackLevel = this.normalizeCombatLevel(initial.magicAttackLevel);
 
     return initial;
   }
@@ -183,6 +224,13 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
       return min;
     }
     return Math.max(min, Math.min(max, value));
+  }
+
+  private normalizeCombatLevel(value: number | undefined): number {
+    if (value === undefined || Number.isNaN(value)) {
+      return 1;
+    }
+    return Math.max(1, Math.floor(value));
   }
 }
 

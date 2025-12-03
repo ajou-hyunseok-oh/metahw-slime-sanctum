@@ -6,8 +6,7 @@
 //
 // Modified by Hyunseok Oh on November 28, 2025
 
-import { Behaviour, BehaviourFinder } from 'Behaviour';
-import { GamePlayers } from 'GamePlayers';
+import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
 import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
@@ -56,7 +55,6 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   private weaponSelector: WeaponSelector | undefined;
 
   private readonly playerStates = new Map<number, ManagedPlayerState>();
-  public gamePlayers: GamePlayers = new GamePlayers();
   private playerPersistentVariables: PlayerPersistentVariables | undefined;
   private playerPersistentCache = new Map<number, PersistentVariables>();
   private matchStateManager: MatchStateManager | undefined;

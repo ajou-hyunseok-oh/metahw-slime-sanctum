@@ -10,7 +10,7 @@ import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { EnemyWaveManager } from 'EnemyWaveManager';
 import { Events, WaveManagerNetworkEvents } from 'Events';
 import { CodeBlockEvents, Component, Player, PropTypes } from 'horizon/core';
-import { PlayerManager } from 'PlayerManager';
+import { PlayerManager, PlayerMode } from 'PlayerManager';
 
 class CombatStarter extends Behaviour<typeof CombatStarter> {
   static propsDefinition = {
@@ -24,7 +24,7 @@ class CombatStarter extends Behaviour<typeof CombatStarter> {
       (player: Player) => {
         var managerName = (BehaviourFinder.GetBehaviour(this.props.waveManager!) as EnemyWaveManager).name;
         this.sendNetworkEvent(this.props.waveManager!, WaveManagerNetworkEvents.StartWaveGroup, {waveGroupName: managerName});
-        PlayerManager.instance.gamePlayers.moveToMatch(player);
+        PlayerManager.instance.setPlayerMode(player, PlayerMode.Match);
         console.log("[CombatStarter] Player entered combat area");
       }
     );
