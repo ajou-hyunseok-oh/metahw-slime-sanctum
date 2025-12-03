@@ -16,6 +16,48 @@ const DEFAULT_ZONE_POOL_PLAN = {
   king: 3,
 };
 
+type WaveSpawnPlan = {
+  wave: number;
+  maxBluePerZone: number;
+  pinkChance: number;
+  kingChance: number;
+  intervalSeconds: number;
+  waveScaling: number;
+};
+
+type ZoneWaveState = {
+  zoneId: number;
+  currentWave: number;
+  nextWaveTime: number;
+  activeBlue: number;
+  activePink: number;
+  activeKing: number;
+  breachInProgress: boolean;
+};
+
+const WAVE_BALANCE_TABLE: WaveSpawnPlan[] = [
+  { wave: 1, maxBluePerZone: 12, pinkChance: 0.05, kingChance: 0.0, intervalSeconds: 45, waveScaling: 1.0 },
+  { wave: 2, maxBluePerZone: 14, pinkChance: 0.08, kingChance: 0.0, intervalSeconds: 42, waveScaling: 1.05 },
+  { wave: 3, maxBluePerZone: 16, pinkChance: 0.10, kingChance: 0.01, intervalSeconds: 40, waveScaling: 1.1 },
+  { wave: 4, maxBluePerZone: 17, pinkChance: 0.12, kingChance: 0.02, intervalSeconds: 38, waveScaling: 1.15 },
+  { wave: 5, maxBluePerZone: 18, pinkChance: 0.15, kingChance: 0.03, intervalSeconds: 36, waveScaling: 1.2 },
+  { wave: 6, maxBluePerZone: 19, pinkChance: 0.17, kingChance: 0.04, intervalSeconds: 34, waveScaling: 1.25 },
+  { wave: 7, maxBluePerZone: 20, pinkChance: 0.19, kingChance: 0.05, intervalSeconds: 32, waveScaling: 1.3 },
+  { wave: 8, maxBluePerZone: 20, pinkChance: 0.22, kingChance: 0.06, intervalSeconds: 30, waveScaling: 1.35 },
+  { wave: 9, maxBluePerZone: 21, pinkChance: 0.24, kingChance: 0.07, intervalSeconds: 29, waveScaling: 1.4 },
+  { wave: 10, maxBluePerZone: 22, pinkChance: 0.26, kingChance: 0.08, intervalSeconds: 28, waveScaling: 1.45 },
+  { wave: 11, maxBluePerZone: 22, pinkChance: 0.28, kingChance: 0.09, intervalSeconds: 27, waveScaling: 1.5 },
+  { wave: 12, maxBluePerZone: 23, pinkChance: 0.30, kingChance: 0.10, intervalSeconds: 26, waveScaling: 1.55 },
+  { wave: 13, maxBluePerZone: 23, pinkChance: 0.32, kingChance: 0.12, intervalSeconds: 25, waveScaling: 1.6 },
+  { wave: 14, maxBluePerZone: 24, pinkChance: 0.34, kingChance: 0.14, intervalSeconds: 24, waveScaling: 1.65 },
+  { wave: 15, maxBluePerZone: 24, pinkChance: 0.36, kingChance: 0.16, intervalSeconds: 23, waveScaling: 1.7 },
+  { wave: 16, maxBluePerZone: 24, pinkChance: 0.38, kingChance: 0.18, intervalSeconds: 22, waveScaling: 1.75 },
+  { wave: 17, maxBluePerZone: 24, pinkChance: 0.40, kingChance: 0.20, intervalSeconds: 21, waveScaling: 1.8 },
+  { wave: 18, maxBluePerZone: 24, pinkChance: 0.42, kingChance: 0.22, intervalSeconds: 20, waveScaling: 1.85 },
+  { wave: 19, maxBluePerZone: 24, pinkChance: 0.44, kingChance: 0.24, intervalSeconds: 19, waveScaling: 1.9 },
+  { wave: 20, maxBluePerZone: 24, pinkChance: 0.46, kingChance: 0.26, intervalSeconds: 18, waveScaling: 2.0 },
+];
+
 export class WavePlayer extends Behaviour<typeof WavePlayer>{
   static propsDefinition = {
     slimeAsset0: { type: PropTypes.Asset }, // Blue Slime
@@ -27,26 +69,19 @@ export class WavePlayer extends Behaviour<typeof WavePlayer>{
   }    
 
 
-  public async spawnWaveSlimes(waveIndex: number, spawnPoint: Entity) {
-    if (waveIndex < 1 || waveIndex > 20) {
+  public getWavePlan(waveIndex: number): WaveSpawnPlan | null {
+    if (waveIndex < 1 || waveIndex > WAVE_BALANCE_TABLE.length) {
       console.error("[WavePlayer] Invalid wave index: ", waveIndex);
-      return;
+      return null;
     }
-
-    const waveData = WaveSpawnData[waveIndex - 1];
-    const slimeCount = waveData.slimeCount;
-    const slimeTypes = waveData.slimeTypes;
-
-    if (!this.props.slimeAsset0) {
-      console.error("[WavePlayer] Slime asset is not set");
-      return;
-    }    
+    return WAVE_BALANCE_TABLE[waveIndex - 1];
   }
 
   private readonly zonePoolInitialized = new Set<number>();
   private readonly zonePoolEntities = new Map<number, Entity[]>();
+  private readonly zoneWaveStates = new Map<number, ZoneWaveState>();
 
-  public async activateZoneObjectPool(zoneId: number, objectPoolEntity: Entity | null) {
+  public async activateZoneObjectPool(zoneId: number, objectPoolEntity: Entity | null, fixedSpawnEntities: Entity[] = []) {
     if (!objectPoolEntity) {
       console.warn(`[WavePlayer] No ObjectPool entity provided for zone ${zoneId}`);
       return;
@@ -86,6 +121,8 @@ export class WavePlayer extends Behaviour<typeof WavePlayer>{
       this.zonePoolInitialized.add(zoneId);
        this.zonePoolEntities.set(zoneId, pooledEntities);
       console.log(`[WavePlayer] Zone ${zoneId} pool primed with blue=${plan.blue}, pink=${plan.pink}, king=${plan.king}`);
+      this.initializeZoneState(zoneId);
+      this.spawnInitialFixedSlimes(zoneId, objectPool, fixedSpawnEntities);
     } catch (error) {
       console.error(`[WavePlayer] Failed to prime pool for zone ${zoneId}`, error);
     }
@@ -115,6 +152,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer>{
 
     this.zonePoolInitialized.delete(zoneId);
     this.zonePoolEntities.delete(zoneId);
+    this.zoneWaveStates.delete(zoneId);
     console.log(`[WavePlayer] Zone ${zoneId} pool drained.`);
   }
 
@@ -146,123 +184,72 @@ export class WavePlayer extends Behaviour<typeof WavePlayer>{
     npcAgent?.assignOwningPool(pool);
     npcAgent?.prepareForPoolStorage();
   }
+
+  private initializeZoneState(zoneId: number) {
+    const now = Date.now();
+    const initialState: ZoneWaveState = {
+      zoneId,
+      currentWave: 1,
+      nextWaveTime: now,
+      activeBlue: 0,
+      activePink: 0,
+      activeKing: 0,
+      breachInProgress: false,
+    };
+    this.zoneWaveStates.set(zoneId, initialState);
+  }
+
+  private spawnInitialFixedSlimes(zoneId: number, pool: ObjectPool, fixedSpawnEntities: Entity[]) {
+    if (!fixedSpawnEntities || fixedSpawnEntities.length === 0) {
+      return;
+    }
+
+    const MAX_INITIAL = 9;
+    let spawned = 0;
+
+    for (const spawnPoint of fixedSpawnEntities) {
+      if (spawned >= MAX_INITIAL) {
+        break;
+      }
+
+      const remaining = MAX_INITIAL - spawned;
+      const randomCount = 1 + Math.floor(Math.random() * 3);
+      const spawnCount = Math.min(remaining, randomCount);
+
+      for (let i = 0; i < spawnCount; i++) {
+        if (spawned >= MAX_INITIAL) {
+          break;
+        }
+        const position = spawnPoint.position.get();
+        const rotation = spawnPoint.rotation.get();
+        const allocated = pool.allocate(position, rotation, null);
+        if (!allocated) {
+          console.warn("[WavePlayer] Not enough pooled slimes to populate fixed spawn.");
+          return;
+        }
+        spawned += 1;
+        this.adjustZoneActiveCount(zoneId, "blue", 1);
+      }
+    }
+  }
+
+  private adjustZoneActiveCount(zoneId: number, type: "blue" | "pink" | "king", delta: number) {
+    const state = this.zoneWaveStates.get(zoneId);
+    if (!state) {
+      return;
+    }
+
+    switch (type) {
+      case "blue":
+        state.activeBlue = Math.max(0, state.activeBlue + delta);
+        break;
+      case "pink":
+        state.activePink = Math.max(0, state.activePink + delta);
+        break;
+      case "king":
+        state.activeKing = Math.max(0, state.activeKing + delta);
+        break;
+    }
+  }
 }
 Component.register(WavePlayer);
-
-const FixedSpawnData = [
-  {
-    fixedSpawnId: 0,
-    slimeCounts: [1, 1, 1],
-  },
-  {
-    fixedSpawnId: 1,
-    slimeCounts: [3, 2, 1],
-  },
-  {
-    fixedSpawnId: 2,
-    slimeCounts: [5, 3, 2],
-  },
-];
-
-const WaveSpawnData = [
-  {
-    waveIndex: 1,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 2,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 3,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 4,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 5,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 6,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 7,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 8,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 9,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 10,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2], 
-  },
-  {
-    waveIndex: 11,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 12,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 13,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 14,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 15,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 16,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 17,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 18,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 19,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2],
-  },
-  {
-    waveIndex: 20,
-    slimeCount: [5, 0, 0],
-    slimeTypes: [0, 1, 2], 
-  },
-]

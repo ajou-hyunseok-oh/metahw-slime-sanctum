@@ -19,6 +19,7 @@ export class LevelController extends Behaviour<typeof LevelController> {
   static propsDefinition = {
     wavePlayer: { type: PropTypes.Entity },
     objectPool: { type: PropTypes.Entity },
+    zoneId: { type: PropTypes.Number, default: 0 },
   };
 
   public coreEntities: Entity[] = [];
@@ -60,8 +61,7 @@ export class LevelController extends Behaviour<typeof LevelController> {
       return;
     }
 
-    // 기존 고정 스폰 로직은 제거하고, 추후 구역별 알고리즘 실행 시 사용하도록 풀만 확보
-    // 현재는 WavePlayer에서 별도 메서드로 관리하므로 여기서는 아무 것도 하지 않는다.
+    wavePlayer.activateZoneObjectPool(this.props.zoneId, objectPool, this.fixedSpawnEntities);
   }
 }
 
