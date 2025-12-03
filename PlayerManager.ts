@@ -120,7 +120,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
       return;
     }
 
-    this.weaponSelector.grabWeapon(WeaponType.Melee, 1, player);
+    this.weaponSelector.grabWeapon(WeaponType.Ranged, 1, player);
   }
 
   public getPlayerMode(player: Player): PlayerMode {
