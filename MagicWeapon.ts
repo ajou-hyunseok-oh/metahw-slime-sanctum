@@ -8,6 +8,8 @@ type MagicWeaponProps = WeaponBase['props'] & {
   attackArcDegrees?: number;
   maxTargetsPerShot?: number;
   effectRadius?: number;
+  launcher?: hz.Entity;
+  projectileSpeed?: number;
 };
 
 class MagicWeapon extends WeaponBase {
@@ -18,6 +20,8 @@ class MagicWeapon extends WeaponBase {
     verticalTolerance: { type: hz.PropTypes.Number, default: 1.5 },
     maxTargetsPerShot: { type: hz.PropTypes.Number, default: 5 },
     effectRadius: { type: hz.PropTypes.Number, default: 4 },
+    launcher: { type: hz.PropTypes.Entity },
+    projectileSpeed: { type: hz.PropTypes.Number, default: 50 },
   };
 
   private get magicProps(): MagicWeaponProps {
@@ -30,6 +34,7 @@ class MagicWeapon extends WeaponBase {
 
   protected override onAttackTriggered(player: hz.Player) {
     super.onAttackTriggered(player);
+    this.launchProjectileLocally();
     this.sendNetworkBroadcastEvent(magicAttackRequestEvent, {
       playerId: player.id,
       weaponEntityId: this.getEntityIdString(),
@@ -66,6 +71,38 @@ class MagicWeapon extends WeaponBase {
   private getEffectRadius(): number {
     const configured = this.magicProps.effectRadius ?? MagicWeapon.propsDefinition.effectRadius.default;
     return Math.max(0.5, configured);
+  }
+
+  private getProjectileSpeed(): number {
+    const configured = this.magicProps.projectileSpeed ?? MagicWeapon.propsDefinition.projectileSpeed.default;
+    return Math.max(1, configured);
+  }
+
+  private cachedLauncher: hz.ProjectileLauncherGizmo | null = null;
+  private launcherResolved = false;
+  private getLauncherGizmo(): hz.ProjectileLauncherGizmo | null {
+    if (!this.launcherResolved) {
+      const launcherEntity = this.magicProps.launcher;
+      this.cachedLauncher = launcherEntity?.as(hz.ProjectileLauncherGizmo) ?? null;
+      this.launcherResolved = true;
+      if (!this.cachedLauncher) {
+        console.warn(`${this.getWeaponLogPrefix()} Projectile launcher gizmo is not assigned.`);
+      }
+    }
+    return this.cachedLauncher;
+  }
+
+  private launchProjectileLocally() {
+    const launcher = this.getLauncherGizmo();
+    if (!launcher) {
+      return;
+    }
+
+    try {
+      launcher.launch({ speed: this.getProjectileSpeed() });
+    } catch (error) {
+      console.warn(`${this.getWeaponLogPrefix()} Failed to launch projectile:`, error);
+    }
   }
 
   private cachedEntityId?: string;

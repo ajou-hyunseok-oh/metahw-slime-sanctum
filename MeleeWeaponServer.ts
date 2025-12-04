@@ -4,10 +4,10 @@ import { Events } from 'Events';
 import { NpcAgent } from 'NpcAgent';
 import { MatchStateManager } from 'MatchStateManager';
 import { meleeAttackRequestEvent, MeleeAttackRequestPayload, MeleeAttackRequestParams } from 'MeleeWeaponEvents';
+import { collectTargetsForPlayer, slimeTargetFilter } from 'TargetingUtils';
 
 type AnyNpcAgent = NpcAgent<any>;
 
-const DEG_TO_RAD = Math.PI / 180;
 const EPSILON = 1e-4;
 const MELEE_DAMAGE_TABLE: { [level: number]: number } = {
   1: 5,
@@ -42,50 +42,36 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
 
   private resolveMeleeSwing(player: hz.Player, payload: MeleeAttackRequestPayload) {
     const params = this.normalizeParams(payload.params);
-    const meleeDamage = this.getMeleeDamageForPlayer(player);
+    const stats = this.getMatchStatsOrWarn(player, payload.weaponEntityId);
+    if (!stats) {
+      return;
+    }
+
+    const meleeDamage = this.getMeleeDamageForLevel(stats.meleeAttackLevel ?? 1);
     if (params.range <= 0 || params.maxTargets <= 0) {
       return;
     }
 
-    const normalizedForward = this.getNormalizedFlatForward(player);
-    if (!normalizedForward) {
-      return;
-    }
-
-    const origin = player.position.get();
-    const cosHalfArc = Math.cos((params.arc * DEG_TO_RAD) * 0.5);
-    const rangeSq = params.range * params.range;
+    const candidates = collectTargetsForPlayer({
+      player,
+      range: params.range,
+      arcDegrees: params.arc,
+      verticalTolerance: params.verticalTolerance,
+      maxTargets: params.maxTargets,
+      filter: slimeTargetFilter,
+    });
 
     let appliedHits = 0;
-    for (const agent of NpcAgent.getActiveAgents()) {
-      if (appliedHits >= params.maxTargets) {
-        break;
-      }
-
-      if (agent.isDead) {
-        continue;
-      }
-
-      const targetPosition = agent.entity.position.get();
-      const deltaX = targetPosition.x - origin.x;
-      const deltaY = targetPosition.y - origin.y;
-      const deltaZ = targetPosition.z - origin.z;
-
-      if (Math.abs(deltaY) > params.verticalTolerance) {
-        continue;
-      }
-
-      const horizontalDistanceSq = deltaX * deltaX + deltaZ * deltaZ;
-      if (horizontalDistanceSq > rangeSq) {
-        continue;
-      }
-
-      const normalizedDot = this.getNormalizedDot(normalizedForward, deltaX, deltaZ, horizontalDistanceSq);
-      if (normalizedDot < cosHalfArc) {
-        continue;
-      }
-
-      this.emitHitEvent(agent, player, targetPosition, deltaX, deltaY, deltaZ, meleeDamage);
+    for (const candidate of candidates) {
+      this.emitHitEvent(
+        candidate.agent,
+        player,
+        candidate.position,
+        candidate.delta.x,
+        candidate.delta.y,
+        candidate.delta.z,
+        meleeDamage
+      );
       appliedHits += 1;
     }
 
@@ -119,29 +105,6 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
     return normal;
   }
 
-  private getNormalizedFlatForward(player: hz.Player): hz.Vec3 | null {
-    const forward = player.forward.get();
-    const flatForward = new hz.Vec3(forward.x, 0, forward.z);
-
-    const magnitudeSq = flatForward.x * flatForward.x + flatForward.z * flatForward.z;
-    if (magnitudeSq <= EPSILON) {
-      return null;
-    }
-
-    const invMagnitude = 1 / Math.sqrt(magnitudeSq);
-    flatForward.x *= invMagnitude;
-    flatForward.z *= invMagnitude;
-    return flatForward;
-  }
-
-  private getNormalizedDot(forward: hz.Vec3, deltaX: number, deltaZ: number, horizontalDistanceSq: number): number {
-    if (horizontalDistanceSq <= EPSILON) {
-      return 1;
-    }
-    const invDistance = 1 / Math.sqrt(horizontalDistanceSq);
-    return (deltaX * forward.x + deltaZ * forward.z) * invDistance;
-  }
-
   private normalizeParams(params: MeleeAttackRequestParams): MeleeAttackRequestParams {
     const range = Math.max(0, params.range);
     const arc = Math.min(Math.max(params.arc, 1), 180);
@@ -150,10 +113,20 @@ class MeleeWeaponServer extends Behaviour<typeof MeleeWeaponServer> {
     return { range, arc, verticalTolerance, maxTargets };
   }
 
-  private getMeleeDamageForPlayer(player: hz.Player): number {
-    const stats = MatchStateManager.instance?.getStats(player);
-    const level = stats?.meleeAttackLevel ?? 1;
-    return this.getMeleeDamageForLevel(level);
+  private getMatchStatsOrWarn(player: hz.Player, weaponEntityId: string): ReturnType<MatchStateManager['getStats']> {
+    const manager = MatchStateManager.instance;
+    if (!manager) {
+      console.warn(`[MeleeWeaponServer] MatchStateManager instance is unavailable; ignoring attack for player=${player.id} weapon=${weaponEntityId}.`);
+      return undefined;
+    }
+
+    const stats = manager.getStats(player);
+    if (!stats) {
+      console.warn(`[MeleeWeaponServer] Match stats missing for player=${player.id}; ignoring attack for weapon=${weaponEntityId}.`);
+      return undefined;
+    }
+
+    return stats;
   }
 
   private getMeleeDamageForLevel(level: number): number {

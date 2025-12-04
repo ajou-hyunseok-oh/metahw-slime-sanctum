@@ -3,7 +3,7 @@ import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
 import { MatchStateManager } from 'MatchStateManager';
 import { NpcAgent } from 'NpcAgent';
-import { MagicProjectile, isSlimeAgent } from 'MagicProjectile';
+import { findClosestTargetForPlayer, isSlimeAgent, slimeTargetFilter } from 'TargetingUtils';
 import {
   magicAttackRequestEvent,
   MagicAttackRequestParams,
@@ -64,11 +64,21 @@ class MagicWeaponServer extends Behaviour<typeof MagicWeaponServer> {
 
   private resolveMagicImpact(player: hz.Player, payload: MagicAttackRequestPayload) {
     const params = this.normalizeParams(payload.params);
-    const target = MagicProjectile.findTargetForPlayer(player, {
+    const stats = this.getMatchStatsOrWarn(player, payload.weaponEntityId);
+    if (!stats) {
+      return;
+    }
+    const magicLevel = stats.magicAttackLevel ?? 1;
+    const damageAmount = this.lookupProgressionValue(MAGIC_DAMAGE_TABLE, magicLevel);
+    const healAmount = this.lookupProgressionValue(MAGIC_HEAL_TABLE, magicLevel);
+
+    const target = findClosestTargetForPlayer({
+      player,
       range: params.range,
-      arc: params.arc,
+      arcDegrees: params.arc,
       verticalTolerance: params.verticalTolerance,
       maxTargets: params.maxTargets,
+      filter: slimeTargetFilter,
     });
 
     if (!target) {
@@ -76,15 +86,13 @@ class MagicWeaponServer extends Behaviour<typeof MagicWeaponServer> {
       return;
     }
 
-    const damageAmount = this.getMagicDamageForPlayer(player);
-    const healAmount = this.getMagicHealForPlayer(player);
     const impactNormal = this.buildHitNormal(target.delta.x, target.delta.y, target.delta.z);
 
-    const damaged = this.damageEnemiesWithinRadius(target.targetPosition, params.effectRadius, player, damageAmount);
-    const healed = this.healPlayersWithinRadius(target.targetPosition, params.effectRadius, healAmount);
+    const damaged = this.damageEnemiesWithinRadius(target.position, params.effectRadius, player, damageAmount);
+    const healed = this.healPlayersWithinRadius(target.position, params.effectRadius, healAmount);
 
     this.sendNetworkBroadcastEvent(Events.projectileHit, {
-      hitPos: target.targetPosition,
+      hitPos: target.position,
       hitNormal: impactNormal,
       fromPlayer: player,
     });
@@ -216,16 +224,20 @@ class MagicWeaponServer extends Behaviour<typeof MagicWeaponServer> {
     };
   }
 
-  private getMagicDamageForPlayer(player: hz.Player): number {
-    const stats = MatchStateManager.instance?.getStats(player);
-    const level = stats?.magicAttackLevel ?? 1;
-    return this.lookupProgressionValue(MAGIC_DAMAGE_TABLE, level);
-  }
+  private getMatchStatsOrWarn(player: hz.Player, weaponEntityId: string): ReturnType<MatchStateManager['getStats']> {
+    const manager = MatchStateManager.instance;
+    if (!manager) {
+      console.warn(`[MagicWeaponServer] MatchStateManager instance is unavailable; ignoring attack for player=${player.id} weapon=${weaponEntityId}.`);
+      return undefined;
+    }
 
-  private getMagicHealForPlayer(player: hz.Player): number {
-    const stats = MatchStateManager.instance?.getStats(player);
-    const level = stats?.magicAttackLevel ?? 1;
-    return this.lookupProgressionValue(MAGIC_HEAL_TABLE, level);
+    const stats = manager.getStats(player);
+    if (!stats) {
+      console.warn(`[MagicWeaponServer] Match stats missing for player=${player.id}; ignoring attack for weapon=${weaponEntityId}.`);
+      return undefined;
+    }
+
+    return stats;
   }
 
   private lookupProgressionValue(table: { [level: number]: number }, level: number): number {
