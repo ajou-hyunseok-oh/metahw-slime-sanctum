@@ -5,14 +5,9 @@
 //
 // Modified by Hyunseok Oh on December 04, 2025
 
-import { Component, NetworkEvent, Player } from 'horizon/core';
+import { Component } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-
-/**
- * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
- */
-const LoadingStartEvent = new NetworkEvent<{}>("LoadingStart");
-const LoadingProgressUpdateEvent = new NetworkEvent<{progress: number}>("LoadingProgressUpdate");
+import { LoadingStartEvent, LoadingProgressUpdateEvent } from 'LoadingEvents';
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
@@ -22,34 +17,27 @@ class LoadingNoesisUI extends Component<typeof LoadingNoesisUI> {
   private loadingProgress: number = 0;  
 
   start() {
-    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
-      this.startServer();
-    } else {
-      this.startClient();
-    }
+    this.initializeLoading();
+    this.setVisibility(false);
+    this.registerNetworkEvents();
   }
 
-  private startServer() {    
-    this.connectNetworkEvent(this.world.getServerPlayer(), LoadingStartEvent, data => {
-      this.setVisibility(true, this.world.getServerPlayer());      
+  private registerNetworkEvents() {
+    const localPlayer = this.world.getLocalPlayer();
+
+    this.connectNetworkEvent(localPlayer, LoadingStartEvent, () => {
+      this.initializeLoading();
+      this.setVisibility(true);
     });
 
-    this.connectNetworkEvent(this.world.getServerPlayer(), LoadingProgressUpdateEvent, data => {
+    this.connectNetworkEvent(localPlayer, LoadingProgressUpdateEvent, data => {
+      this.setVisibility(true);
       this.updateLoadingProgress(data.progress);
     });
   }
 
-  private startClient() {    
-    this.initializeLoading();
-    this.setVisibility(false, this.world.getLocalPlayer());
-  }
-
-  private setVisibility(visible: boolean, player: Player) {
+  private setVisibility(visible: boolean) {
     this.entity.visible.set(visible);
-
-    if (visible) {
-      this.initializeLoading();
-    }
   }
 
   private initializeLoading() {
