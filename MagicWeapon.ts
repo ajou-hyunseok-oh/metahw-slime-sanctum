@@ -1,6 +1,9 @@
 import * as hz from 'horizon/core';
 import { magicAttackRequestEvent } from 'MagicWeaponEvents';
 import { WeaponBase } from 'WeaponBase';
+import { findClosestTargetForPlayer, slimeTargetFilter, TargetCandidate } from 'TargetingUtils';
+
+const EPSILON = 1e-4;
 
 type MagicWeaponProps = WeaponBase['props'] & {
   attackRange?: number;
@@ -34,7 +37,8 @@ class MagicWeapon extends WeaponBase {
 
   protected override onAttackTriggered(player: hz.Player) {
     super.onAttackTriggered(player);
-    this.launchProjectileLocally();
+    const target = this.acquireAutoTarget(player);
+    this.launchProjectileLocally(player, target);
     this.sendNetworkBroadcastEvent(magicAttackRequestEvent, {
       playerId: player.id,
       weaponEntityId: this.getEntityIdString(),
@@ -92,17 +96,38 @@ class MagicWeapon extends WeaponBase {
     return this.cachedLauncher;
   }
 
-  private launchProjectileLocally() {
+  private launchProjectileLocally(player: hz.Player, target: TargetCandidate | null) {
     const launcher = this.getLauncherGizmo();
     if (!launcher) {
       return;
     }
 
     try {
-      launcher.launch({ speed: this.getProjectileSpeed() });
+      const startPosition = this.getLaunchStartPosition(launcher);
+      const direction = this.computeLaunchDirection(player, target, startPosition);
+      if (!direction) {
+        console.warn(`${this.getWeaponLogPrefix()} Unable to resolve projectile direction; launch skipped.`);
+        return;
+      }
+      launcher.launch({
+        speed: this.getProjectileSpeed(),
+        overrideStartPositionAndDirection: {
+          startPosition,
+          direction,
+        },
+      });
     } catch (error) {
       console.warn(`${this.getWeaponLogPrefix()} Failed to launch projectile:`, error);
     }
+  }
+
+  private getLaunchStartPosition(launcher: hz.ProjectileLauncherGizmo): hz.Vec3 {
+    const wandPosition = this.entity?.position?.get?.();
+    if (wandPosition) {
+      return wandPosition;
+    }
+
+    return launcher.position.get();
   }
 
   private cachedEntityId?: string;
@@ -111,6 +136,41 @@ class MagicWeapon extends WeaponBase {
       this.cachedEntityId = this.entity.id.toString();
     }
     return this.cachedEntityId;
+  }
+
+  private acquireAutoTarget(player: hz.Player): TargetCandidate | null {
+    return findClosestTargetForPlayer({
+      player,
+      range: this.getAttackRange(),
+      arcDegrees: this.getAttackArcDegrees(),
+      verticalTolerance: this.getVerticalTolerance(),
+      maxTargets: this.getMaxTargetsPerShot(),
+      filter: slimeTargetFilter,
+    });
+  }
+
+  private computeLaunchDirection(player: hz.Player, target: TargetCandidate | null, origin: hz.Vec3): hz.Vec3 | null {
+    if (target) {
+      const direction = new hz.Vec3(
+        target.position.x - origin.x,
+        target.position.y - origin.y,
+        target.position.z - origin.z
+      );
+      return this.normalizeDirection(direction);
+    }
+
+    const forward = player.forward.get();
+    return this.normalizeDirection(forward);
+  }
+
+  private normalizeDirection(direction: hz.Vec3): hz.Vec3 | null {
+    const magnitudeSq = direction.x * direction.x + direction.y * direction.y + direction.z * direction.z;
+    if (magnitudeSq <= EPSILON) {
+      return null;
+    }
+
+    const invMagnitude = 1 / Math.sqrt(magnitudeSq);
+    return new hz.Vec3(direction.x * invMagnitude, direction.y * invMagnitude, direction.z * invMagnitude);
   }
 }
 hz.Component.register(MagicWeapon);
