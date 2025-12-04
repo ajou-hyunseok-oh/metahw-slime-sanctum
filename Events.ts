@@ -15,7 +15,6 @@ export const Events = {
   weaponEquipped: new NetworkEvent<{ player: Player, weaponKey: string, weaponType: string, isRightHand: boolean }>('weaponEquipped'),
 
   // Gun Events
-  projectileHit: new NetworkEvent<{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player}>('projectileHit'),
   playerScoredHit: new NetworkEvent<{player : Player, entity : Entity}>('playerScoredHit'),
   gunRequestAmmo: new NetworkEvent<{player: Player, weapon: Entity, ammoCount : number}>('gunRequestAmmo'),
   gunRequestAmmoResponse: new NetworkEvent<{ammoCount : number}>('gunRequestAmmoResponse'),

@@ -3,7 +3,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on December 02, 2025
+// Modified by Hyunseok Oh on December 04, 2025 
 
 import { Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
@@ -27,18 +27,17 @@ const playerPersistentStatsUpdateEvent = (Events as unknown as {
  * This is an example of a NoesisUI component that can be used in a world.
  * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
  */
-class LobbyPageView extends Component<typeof LobbyPageView> {  
+class LobbyPageView extends Component<typeof LobbyPageView> {
   start() {
-    if (!this.shouldRunLocally()) {
+    const localPlayer = this.world.getLocalPlayer();
+    const serverPlayer = this.world.getServerPlayer();
+
+    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
       console.log('[LobbyPageView] Server context detected; skipping client UI logic.');
       return;
     }
-
-    const localPlayer = this.world.getLocalPlayer();
-    if (!localPlayer) {
-      console.warn('[LobbyPageView] No local player available.');
-      return;
-    }
+    
+    console.log('[LobbyPageView] locally started');
     
     this.connectNetworkEvent(localPlayer, playerModeChangedEvent, payload => {
       const isLobby = payload.mode === PlayerMode.Lobby;
@@ -78,16 +77,6 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
     };
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
-  }
-
-  private shouldRunLocally(): boolean {
-    try {
-      const localPlayer = this.world.getLocalPlayer();
-      const serverPlayer = this.world.getServerPlayer();
-      return !!localPlayer && !!serverPlayer && localPlayer.id !== serverPlayer.id;
-    } catch {
-      return false;
-    }
   }
 }
 

@@ -111,8 +111,6 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
     // The starting position is a good position to fallback to
     this.lastKnownGood = this.entity.position.get();
 
-    this.connectNetworkEvent(this.props.collider!, Events.projectileHit, this.bulletHit.bind(this));
-    this.connectNetworkEvent(this.entity, Events.projectileHit, this.bulletHit.bind(this));
     this.connectNetworkEvent(this.props.collider!, Events.meleeHit, this.onMeleeHit.bind(this));
     this.connectNetworkEvent(this.entity, Events.meleeHit, this.onMeleeHit.bind(this));
   }
@@ -278,13 +276,6 @@ export class NpcAgent<T> extends Behaviour<typeof NpcAgent & T> implements INpcA
         this.stopIdleScaleAnimation(true);
         this.stopAttackScaleAnimation(true);
     }
-  }
-
-  private bulletHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player }) {
-    var bulletDamage = this.config.minBulletDamage + Math.floor((this.config.maxBulletDamage - this.config.minBulletDamage) * Math.random());
-
-    this.npcHit(data.hitPos, data.hitNormal, bulletDamage);
-    this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
   }
 
   private onMeleeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number }) {

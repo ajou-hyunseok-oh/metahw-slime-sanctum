@@ -91,12 +91,6 @@ class MagicWeaponServer extends Behaviour<typeof MagicWeaponServer> {
     const damaged = this.damageEnemiesWithinRadius(target.position, params.effectRadius, player, damageAmount);
     const healed = this.healPlayersWithinRadius(target.position, params.effectRadius, healAmount);
 
-    this.sendNetworkBroadcastEvent(Events.projectileHit, {
-      hitPos: target.position,
-      hitNormal: impactNormal,
-      fromPlayer: player,
-    });
-
     console.log(
       `[MagicWeaponServer] player=${player.id} weapon=${payload.weaponEntityId} damageHits=${damaged} healedPlayers=${healed}`
     );
