@@ -17,6 +17,14 @@ class LoadingNoesisUI extends Component<typeof LoadingNoesisUI> {
   private loadingProgress: number = 0;  
 
   start() {
+    const localPlayer = this.world.getLocalPlayer();
+    const serverPlayer = this.world.getServerPlayer();
+
+    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
+      console.log('[TitlePageView] Server context detected; skipping client UI logic.');
+      return;
+    }
+    
     this.initializeLoading();
     this.setVisibility(false);
     this.registerNetworkEvents();

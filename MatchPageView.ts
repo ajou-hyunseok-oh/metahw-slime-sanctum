@@ -30,16 +30,19 @@ const matchStateUpdateEvent = (Events as unknown as {
 class MatchPageView extends Component<typeof MatchPageView> {
 
   start() {
-    if (!this.shouldRunLocally()) {
-      console.log('[MatchPageView] Server context detected; skipping client UI logic.');
+    const localPlayer = this.world.getLocalPlayer();
+    const serverPlayer = this.world.getServerPlayer();
+
+    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
+      console.log('[TitlePageView] Server context detected; skipping client UI logic.');
       return;
     }
 
+    this.startClient();
+  }
+
+  private startClient() {
     const localPlayer = this.world.getLocalPlayer();
-    if (!localPlayer) {
-      console.warn('[MatchPageView] No local player available.');
-      return;
-    }    
 
     this.connectNetworkEvent(localPlayer, playerModeChangedEvent, payload => {
       const isMatch = payload.mode === PlayerMode.Match;
@@ -70,8 +73,7 @@ class MatchPageView extends Component<typeof MatchPageView> {
 
   private onMatchStatsUpdated(stats: MatchStateUpdatePayload) {
     const dataContext = {
-      CurrentHP: stats.hpCurrent,
-      MinHP: stats.hpMax,
+      CurrentHP: stats.hpCurrent,      
       MaxHP: stats.hpMax,
       HPText: `${stats.hpCurrent}/${stats.hpMax}`,
       MeleeLevel: stats.meleeAttackLevel,
@@ -85,25 +87,14 @@ class MatchPageView extends Component<typeof MatchPageView> {
 
   private createEmptyDataContext() {
     return {
-      HpCurrent: 0,
-      HpMax: 0,
-      Defense: 0,
+      CurrentHP: 0,
+      MaxHP: 0,
+      HPText: `${0}/${0}`,
+      DefenceLevel: 0,
       MeleeLevel: 0,
       RangedLevel: 0,
-      MagicLevel: 0,
-      SlimeKills: 0,
-      WavesSurvived: 0,
+      MagicLevel: 0
     };
-  }
-
-  private shouldRunLocally(): boolean {
-    try {
-      const localPlayer = this.world.getLocalPlayer();
-      const serverPlayer = this.world.getServerPlayer();
-      return !!localPlayer && !!serverPlayer && localPlayer.id !== serverPlayer.id;
-    } catch {
-      return false;
-    }
   }
 }
 
