@@ -2,9 +2,9 @@ import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, PropTypes, Quaternion, Vec3 } from 'horizon/core';
 
 export const PullSize = {
-  Blue: 4,
-  Pink: 3,
-  King: 2,
+  Blue: 18,
+  Pink: 9,
+  King: 3,
 } as const;
 
 export enum SlimeType {

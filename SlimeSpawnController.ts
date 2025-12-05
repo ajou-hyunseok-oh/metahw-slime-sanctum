@@ -36,7 +36,7 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
   }
 
   private getRandomVector3(): Vec3 {
-    return new Vec3(Math.random() * 10 - 5, Math.random() * 10 - 5, Math.random() * 10 - 5);
+    return new Vec3(Math.random() * 2 - 4, 3, Math.random() * 2 - 4);
   }
 }
 Component.register(SlimeSpawnController);
