@@ -8,6 +8,7 @@ export const PlayerCameraEvents = {
   SetCameraMode: new hz.NetworkEvent<{ mode: CameraMode}>('SetCameraMode'),
   SetCameraFixedPosition: new hz.NetworkEvent<{position: hz.Vec3, rotation?: hz.Quaternion, duration?: number, easing: Easing}>('SetCameraFixedPosition'),
   SetCameraFixedPositionWithEntity: new hz.NetworkEvent<{entity: hz.Entity, duration?: number, easing?: Easing}>('SetCameraFixedPositionWithEntity'),
+  SetCameraSanctumFlying: new hz.NetworkEvent<{entity: hz.Entity, duration?: number, easing?: Easing}>('SetCameraSanctumFlying'),
   SetCameraLobby: new hz.NetworkEvent<{entity: hz.Entity, duration?: number, easing?: Easing}>('SetCameraLobby'),
   SetCameraAttachWithTarget: new hz.NetworkEvent<{target: hz.Entity | hz.Player, positionOffset?: hz.Vec3, rotationOffset?: hz.Vec3 | hz.Quaternion}>('SetCameraAttachWithPlayer'),
   SetCameraPan: new hz.NetworkEvent<{positionOffset: hz.Vec3, translationSpeed: number}>('SetCameraPan'),  
@@ -169,6 +170,13 @@ export class PlayerCamera extends hz.Component<typeof PlayerCamera> {
   // Use an entity's position and rotation to set the camera to a fixed position and rotation.
   // Pass this function an empty object from the world to use it's position and rotation - helpful for avoiding the use of hardcoded values.
   setCameraFixedPositionWithEntity(entity: hz.Entity, duration: number | undefined, easing: Easing | undefined) {
+    const position = entity.position.get();
+    const rotation = entity.rotation.get();
+    this.setCameraFixedPosition(position, rotation, duration, easing);
+  }
+
+  setCameraSanctumFlying(entity: hz.Entity, duration: number | undefined, easing: Easing | undefined) {
+    this.displayCameraResetButton(false);
     const position = entity.position.get();
     const rotation = entity.rotation.get();
     this.setCameraFixedPosition(position, rotation, duration, easing);

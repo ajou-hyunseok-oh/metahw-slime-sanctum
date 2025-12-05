@@ -108,8 +108,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
         break;
       case PlayerMode.Match:
         console.log(`[PlayerManager] ${player.name.get()} -> Match`);
-        this.matchStateManager?.enterMatch(player);
-        this.grantMatchStartingWeapon(player);
+        this.matchStateManager?.enterMatch(player);        
         break;
     }
   }

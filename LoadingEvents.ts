@@ -9,5 +9,6 @@ import { NetworkEvent } from 'horizon/core';
 
 export const LoadingStartEvent = new NetworkEvent<{}>('LoadingStart');
 export const LoadingProgressUpdateEvent = new NetworkEvent<{ progress: number }>('LoadingProgressUpdate');
+export const LoadingCompleteEvent = new NetworkEvent<{}>('LoadingComplete');
 
 

@@ -7,7 +7,7 @@
 
 import { Component } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-import { LoadingStartEvent, LoadingProgressUpdateEvent } from 'LoadingEvents';
+import { LoadingStartEvent, LoadingProgressUpdateEvent, LoadingCompleteEvent } from 'LoadingEvents';
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
@@ -33,6 +33,10 @@ class LoadingNoesisUI extends Component<typeof LoadingNoesisUI> {
     this.connectNetworkEvent(localPlayer, LoadingProgressUpdateEvent, data => {
       this.setVisibility(true);
       this.updateLoadingProgress(data.progress);
+    });
+
+    this.connectNetworkEvent(localPlayer, LoadingCompleteEvent, () => {
+      this.setVisibility(false);
     });
   }
 
