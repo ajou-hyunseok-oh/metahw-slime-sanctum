@@ -5,31 +5,39 @@
 //
 // Modified by Hyunseok Oh on December 04, 2025
 
-import { Behaviour } from 'Behaviour';
+import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, CodeBlockEvents, Entity, PropTypes, Player, SpawnPointGizmo, TriggerGizmo } from 'horizon/core';
 import { SublevelEntity } from 'horizon/world_streaming';
 import { PlayerManager, PlayerMode } from 'PlayerManager';
 import { LoadingStartEvent, LoadingProgressUpdateEvent, LoadingCompleteEvent } from 'LoadingEvents';
 import { CutsceneEvents } from 'SanctumCutscene';
+import { SlimeSpawnController } from 'SlimeSpawnController';
+
 export class SublevelController extends Behaviour<typeof SublevelController> {
   static propsDefinition = {
     sublevel: { type: PropTypes.Entity },
     startingZoneTrigger: { type: PropTypes.Entity },
     sanctumCutscene: { type: PropTypes.Entity },
+    slimeSpawnController: { type: PropTypes.Entity },
   };
 
   private coreEntities: Entity[] = [];
   private fixedSpawnEntities: Entity[] = [];
   private spawnEntities: Entity[] = [];
-
-  Awake() {
+  private slimeSpawnController: SlimeSpawnController | null = null;
+  
+  Awake() {    
     this.connectCodeBlockEvent(this.props.startingZoneTrigger!, CodeBlockEvents.OnPlayerEnterTrigger, this.onPlayerEnterStartingZone.bind(this));
+  }
+
+  Start() {
+    this.slimeSpawnController = BehaviourFinder.GetBehaviour<SlimeSpawnController>(this.props.slimeSpawnController) ?? null;
   }
   
   public load(players: Player[]) {
     const sublevel = this.props.sublevel!.as(SublevelEntity);
     if (!sublevel) {
-      console.warn(`[PartyMaker] No valid SublevelEntity assigned!`);
+      console.warn(`[SublevelController] No valid SublevelEntity assigned!`);
       return;
     }
 
@@ -44,30 +52,32 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       .then(async () => {
         const startingPoint = await this.waitForEntity(sublevel, "StartingPoint", 10, 200);
         if (!startingPoint) {
-          console.error("[PartyMaker] Failed to find StartingPoint.");
+          console.error("[SublevelController] Failed to find StartingPoint.");
           this.completeLoading(players, false);
           return;
-        }
-
-        this.teleportPlayersToStartingPoint(players, startingPoint.as(SpawnPointGizmo));
-        this.sendLoadingProgress(players, 50);
-
+        }        
         // 주요 지점 검색
         const spotsReady = await this.findSpots(sublevel);
-
-        // 오브젝트 풀 초기화
-        // 고정 슬라임 스폰
-        // 끝나면 로딩 완료
+        this.sendLoadingProgress(players, 10);
+        await this.slimeSpawnController!.spawnSanctum(this.fixedSpawnEntities, this.spawnEntities, this.coreEntities[0]!, players, 10);
         
-        const loadSuccessful = !!spotsReady;
-        this.completeLoading(players, loadSuccessful);
+        // 모든 스폰 완료 후 100% 전송
+        this.sendLoadingProgress(players, 100);
+        
+        this.teleportPlayersToStartingPoint(players, startingPoint.as(SpawnPointGizmo));
+        
+        // Trigger 활성화 (플레이어 도착 감지용)
+        this.props.startingZoneTrigger!.as(TriggerGizmo).enabled.set(true);
+
+        // SlimeSpawnController handles loading completion
+        // const loadSuccessful = !!spotsReady;
+        // this.completeLoading(players, loadSuccessful);
 
         // 고정 카메라 연출 시작:  이벤트 발생
         // 고정 카메리 연출이 끝나면 시작 지점 트리거 활성화 이벤트 진행
-        this.props.startingZoneTrigger!.as(TriggerGizmo).enabled.set(true);
       })
       .catch((error) => {
-        console.error(`[PartyMaker] Failed to activate sublevel: ${error}`);
+        console.error(`[SublevelController] Failed to activate sublevel: ${error}`);
         this.completeLoading(players, false);
         // 모두 로비 스폰지점으로.
       });
@@ -87,7 +97,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
             check(remainingAttempts - 1);
           }, interval);
         } else {
-          console.error(`[PartyMaker] Failed to find entity '${name}' after multiple attempts.`);
+          console.error(`[SublevelController] Failed to find entity '${name}' after multiple attempts.`);
           resolve(null);
         }
       };
@@ -117,7 +127,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
   private async findSpots(sublevel: SublevelEntity): Promise<boolean> {
     const levelEntity = await this.waitForEntity(sublevel, "[Level]", 10, 200);
     if (!levelEntity) {
-      console.warn("[PartyMaker] '[Level]' entity could not be located after teleport.");
+      console.warn("[SublevelController] '[Level]' entity could not be located after teleport.");
       return false;
     }
 
@@ -127,13 +137,13 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       const entities = grouped[name] ?? [];
       const sharedArray = this.getSharedArrayByName(name);
       if (!sharedArray) {
-        console.warn(`[PartyMaker] No shared array registered for ${name}.`);
+        console.warn(`[SublevelController] No shared array registered for ${name}.`);
         return;
       }
       sharedArray.length = 0;
       sharedArray.push(...entities);
       sharedArray.forEach((entity, index) => {
-        console.log(`[PartyMaker]   - (${index}) ${entity.name.get()}`);
+        console.log(`[SublevelController]   - (${index}) ${entity.name.get()}`);
       });
     });
 
@@ -194,7 +204,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
 
   private teleportPlayersToStartingPoint(players: Player[], startingPoint?: SpawnPointGizmo | null) {
     if (!startingPoint) {
-      console.error("[PartyMaker] StartingPoint is not a SpawnPointGizmo!");
+      console.error("[SublevelController] StartingPoint is not a SpawnPointGizmo!");
       return;
     }
 
@@ -217,11 +227,13 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     });
   }
 
-  private onPlayerEnterStartingZone(player: Player) {
-    console.log(`[SublevelController::onPlayerEnterStartingZone] Player ${player.name.get()} entered starting zone.`);
+  private onPlayerEnterStartingZone(player: Player) {    
+    // 플레이어가 시작 지점에 도착했으므로 로딩 완료 처리 (화면 닫기)
+    this.sendNetworkEvent(player, LoadingCompleteEvent, {});
+
     const cutsceneEntity = this.props.sanctumCutscene;
     if (!cutsceneEntity) {
-      console.warn('SanctumCutsceneTrigger: sanctumCutscene prop missing');
+      console.warn('SublevelController: sanctumCutscene prop missing');
       return;
     }
 

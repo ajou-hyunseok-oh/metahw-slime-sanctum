@@ -3,46 +3,96 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on December 02, 2025
+// Modified by Hyunseok Oh on December 05, 2025
 
-import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
+import { Component, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
+import { WeaponSelectorEvents, WeaponType } from './WeaponSelector';
 
 /**
- * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
+ * A simple implementation of the Command pattern for Noesis UI.
  */
-const LevelUpWindowViewEvent = new NetworkEvent<{greeting: string}>("LevelUpWindowViewEvent");
+class DelegateCommand {
+  private readonly _action: (parameter?: any) => void;
+  private readonly _canExecute: (parameter?: any) => boolean;
 
-/**
- * This is an example of a NoesisUI component that can be used in a world.
- * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
- */
-class LevelUpWindowView extends Component<typeof LevelUpWindowView> {
+  constructor(action: (parameter?: any) => void, canExecute?: (parameter?: any) => boolean) {
+    this._action = action;
+    this._canExecute = canExecute || (() => true);
+  }
 
-  start() {
-    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
-      this.startServer();
-    } else {
-      this.startClient();
+  execute(parameter?: any): void {
+    if (this.canExecute(parameter)) {
+      this._action(parameter);
     }
   }
 
-  private startServer() {
-    // Noesis dataContext can't be directly controlled from the server
-    // but server can send events to the clients so that they would update their dataContexts accordingly
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
-      this.sendNetworkEvent(player, LevelUpWindowViewEvent, {greeting: `Welcome ${player.name.get()}`});
-    });
+  canExecute(parameter?: any): boolean {
+    return this._canExecute(parameter);
+  }
+}
+
+/**
+ * Manages the Level Up Window UI and handles weapon selection events.
+ */
+class LevelUpWindowView extends Component<typeof LevelUpWindowView> {
+  
+  start() {
+    const localPlayer = this.world.getLocalPlayer();
+    const serverPlayer = this.world.getServerPlayer();
+
+    // Run UI logic only on the client side
+    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
+      return;
+    }
+
+    this.startClient();
   }
 
   private startClient() {
-    const dataContext = {};
-    this.entity.as(NoesisGizmo).dataContext = dataContext;
-    // After a dataContext object is attached to a Noesis gizmo, it's automatically tracked for changes
-    // so simply updating it will automatically update the UI.
-    this.connectNetworkEvent(this.world.getLocalPlayer(), LevelUpWindowViewEvent, data => {
-      console.log('NoesisUI: OnEvent', data);      
+    // Bind commands to the data context
+    /*
+    const dataContext = {
+      SelectMeleeCommand: new DelegateCommand(this.onSelectMelee.bind(this)),
+      SelectRangedCommand: new DelegateCommand(this.onSelectRanged.bind(this)),
+      SelectMagicCommand: new DelegateCommand(this.onSelectMagic.bind(this)),
+    };
+
+    const gizmo = this.entity.as(NoesisGizmo);
+    if (gizmo) {
+      gizmo.dataContext = dataContext;
+    }
+    */
+  }
+
+  private onSelectMelee(level: any) {
+    this.requestWeapon(WeaponType.Melee, level);
+  }
+
+  private onSelectRanged(level: any) {
+    this.requestWeapon(WeaponType.Ranged, level);
+  }
+
+  private onSelectMagic(level: any) {
+    this.requestWeapon(WeaponType.Magic, level);
+  }
+
+  private requestWeapon(weaponType: WeaponType, level: any) {
+    const localPlayer = this.world.getLocalPlayer();
+    if (!localPlayer) return;
+
+    const parsedLevel = parseInt(level, 10);
+    if (isNaN(parsedLevel)) {
+      console.warn(`[LevelUpWindowView] Invalid weapon level: ${level}`);
+      return;
+    }
+
+    console.log(`[LevelUpWindowView] Requesting ${weaponType} Lv.${parsedLevel}`);
+
+    this.sendNetworkEvent(this.entity, WeaponSelectorEvents.requestWeapon, {
+      playerId: localPlayer.id,
+      weaponType: weaponType,
+      level: parsedLevel,
     });
   }
 }

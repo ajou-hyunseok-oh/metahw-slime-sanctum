@@ -1,42 +1,83 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, Player, PropTypes, Quaternion, Vec3 } from 'horizon/core';
-import { SlimeObjectPool, SlimeType } from 'SlimeObjectPool';
+import { SlimeObjectPool, SlimeType, PullSize } from 'SlimeObjectPool';
+import { LoadingProgressUpdateEvent } from 'LoadingEvents';
 
 export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController> {
   static propsDefinition = {
-    slimeObjectPool: { type: PropTypes.Entity },
-    blueAsset: { type: PropTypes.Asset, default: undefined },
-    pinkAsset: { type: PropTypes.Asset, default: undefined },
-    kingAsset: { type: PropTypes.Asset, default: undefined }    
+    slimeObjectPool: { type: PropTypes.Entity },    
   };
 
-  private slimeObjectPool: SlimeObjectPool | null = null;  
-  
-  // Test
-  private spawnInterval: number | null = null;
+  private slimeObjectPool: SlimeObjectPool | null = null;
+  private coreEntity: Entity | null = null;
+  private fixedSpawnEntities: Entity[] = [];
+  private waveSpawnEntities: Entity[] = [];
   
   Start() {
-    this.slimeObjectPool = BehaviourFinder.GetBehaviour<SlimeObjectPool>(this.props.slimeObjectPool) ?? null;
+    this.slimeObjectPool = BehaviourFinder.GetBehaviour<SlimeObjectPool>(this.props.slimeObjectPool) ?? null;    
+  }
+
+  public async spawnSanctum(fixedSpawnEntities: Entity[], waveSpawnEntities: Entity[], coreEntities: Entity, players: Player[], startProgress: number) {    
+    // reference copy
+    this.coreEntity = coreEntities;
+    this.fixedSpawnEntities = fixedSpawnEntities;
+    this.waveSpawnEntities = waveSpawnEntities;    
     
-    // 1초 주기로 슬라임 스폰 시작
-    this.spawnInterval = this.async.setInterval(() => {
-      console.warn('spawnInterval');
-      void this.getRandomSlimeAsset();
-    }, 1000);
+    // 전체 80%를 전체 블루 슬라임 수로 나누어 균등하게 할당
+    const progressStep = 80 / PullSize.Blue;
+
+    const nextProgress = await this.spawnFixedSlimes(players, startProgress, progressStep);
+    await this.spawnWaveSlimes(players, nextProgress, progressStep);
   }
 
-  private async getRandomSlimeAsset() {
-    const randomType = ['blue', 'pink', 'king'][Math.floor(Math.random() * 3)];
+  private async spawnFixedSlimes(players: Player[], startProgress: number, step: number): Promise<number> {
+    let currentProgress = startProgress;
 
-    switch (randomType) {
-      case 'blue': this.slimeObjectPool?.spawn(SlimeType.Blue, this.getRandomVector3(), new Quaternion(0, 0, 0, 1));       break;
-      case 'pink': this.slimeObjectPool?.spawn(SlimeType.Pink, this.getRandomVector3(), new Quaternion(0, 0, 0, 1));       break;
-      case 'king': this.slimeObjectPool?.spawn(SlimeType.King, this.getRandomVector3(), new Quaternion(0, 0, 0, 1));       break;
+    for (const entity of this.fixedSpawnEntities) {
+      for (let i = 0; i < 3; i++) {
+        this.slimeObjectPool?.spawn(SlimeType.Blue, entity.position.get(), entity.rotation.get());
+        
+        // Update progress
+        currentProgress += step;
+        // 99%까지만 진행, 100%는 텔레포트 직전에 SublevelController에서 처리
+        const displayProgress = Math.min(Math.floor(currentProgress), 99);
+
+        players.forEach(player => {
+          this.sendNetworkEvent(player, LoadingProgressUpdateEvent, { progress: displayProgress });
+        });
+
+        // Small delay for visual effect
+        await new Promise(resolve => this.async.setTimeout(resolve, 100)); 
+      }
     }
+    return currentProgress;
   }
 
-  private getRandomVector3(): Vec3 {
-    return new Vec3(Math.random() * 2 - 4, 3, Math.random() * 2 - 4);
+  private async spawnWaveSlimes(players: Player[], startProgress: number, step: number) {
+    const alreadySpawned = this.fixedSpawnEntities.length * 3;
+    const maxCount = PullSize.Blue;
+    const remainingCount = Math.max(0, maxCount - alreadySpawned);
+
+    if (remainingCount <= 0) {
+      return;
+    }
+
+    let currentProgress = startProgress;
+
+    for (let i = 0; i < remainingCount; i++) {
+      // waveSpawnEntities 위치를 순환하며 사용
+      const spawnEntity = this.waveSpawnEntities[i % this.waveSpawnEntities.length];
+      if (spawnEntity) {
+        this.slimeObjectPool?.spawn(SlimeType.Blue, spawnEntity.position.get(), spawnEntity.rotation.get());
+      }
+
+      currentProgress += step;
+      players.forEach(player => {
+        this.sendNetworkEvent(player, LoadingProgressUpdateEvent, { progress: Math.min(Math.floor(currentProgress), 99) });
+      });
+
+      await new Promise(resolve => this.async.setTimeout(resolve, 100));
+    }
   }
 }
 Component.register(SlimeSpawnController);

@@ -33,13 +33,19 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
   static propsDefinition = {
     meleeLv1Asset: { type: PropTypes.Asset, default: null },
     meleeLv2Asset: { type: PropTypes.Asset, default: null },
-    meleeLv3Asset: { type: PropTypes.Asset, default: null },    
+    meleeLv3Asset: { type: PropTypes.Asset, default: null },
+    meleeLv4Asset: { type: PropTypes.Asset, default: null },
+    meleeLv5Asset: { type: PropTypes.Asset, default: null },
     rangedLv1Asset: { type: PropTypes.Asset, default: null },
     rangedLv2Asset: { type: PropTypes.Asset, default: null },
-    rangedLv3Asset: { type: PropTypes.Asset, default: null },    
+    rangedLv3Asset: { type: PropTypes.Asset, default: null },
+    rangedLv4Asset: { type: PropTypes.Asset, default: null },
+    rangedLv5Asset: { type: PropTypes.Asset, default: null },
     magicLv1Asset: { type: PropTypes.Asset, default: null },
     magicLv2Asset: { type: PropTypes.Asset, default: null },
-    magicLv3Asset: { type: PropTypes.Asset, default: null },    
+    magicLv3Asset: { type: PropTypes.Asset, default: null },
+    magicLv4Asset: { type: PropTypes.Asset, default: null },
+    magicLv5Asset: { type: PropTypes.Asset, default: null },
   };
 
   static instance: WeaponSelector | undefined;
@@ -144,7 +150,7 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
     if (!Number.isFinite(level)) {
       return 1;
     }
-    return Math.min(Math.max(Math.floor(level), 1), 3);
+    return Math.min(Math.max(Math.floor(level), 1), 5);
   }
 
   private getSpawnTransform(player: Player) {
