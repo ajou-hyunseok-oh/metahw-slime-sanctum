@@ -1,10 +1,10 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, Player, Quaternion, Vec3, PropTypes } from 'horizon/core';
 
-export const pullSize = {
-  blue: 4,
-  pink: 3,
-  king: 2,
+export const PullSize = {
+  Blue: 4,
+  Pink: 3,
+  King: 2,
 } as const;
 
 export enum SlimeType {
@@ -38,45 +38,118 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
   public spawn(type: SlimeType, position: Vec3, rotation: Quaternion) {
     console.log(`[SlimeObject::spawn] ${type}/${position}/${rotation}`);
 
-    // 풀 크기에 맞춰서 생성 또는 재활용
+    if (this.isFull(type)) {
+      if (type === SlimeType.Blue) {
+        if (this.blueFreeEntities.size == 0) {
+          const oldBlueEntity = this.blueAllocatedEntities.values().next().value;                    
+          const slimeObject = BehaviourFinder.GetBehaviour(oldBlueEntity) as unknown as ISlimeObject;
+          slimeObject.onFree();
+          slimeObject?.onAllocate(position, rotation);
+          return oldBlueEntity;
+        }
+
+        const blueEntity = this.blueFreeEntities.values().next().value;
+        this.blueFreeEntities.delete(blueEntity);
+        this.blueAllocatedEntities.add(blueEntity);
+        const slimeObject = BehaviourFinder.GetBehaviour(blueEntity) as unknown as ISlimeObject;
+        slimeObject?.onAllocate(position, rotation);
+        return blueEntity;
+      } else if (type === SlimeType.Pink) {
+        if (this.pinkFreeEntities.size == 0) {
+          const oldPinkEntity = this.pinkAllocatedEntities.values().next().value;                    
+          const slimeObject = BehaviourFinder.GetBehaviour(oldPinkEntity) as unknown as ISlimeObject;
+          slimeObject.onFree();
+          slimeObject?.onAllocate(position, rotation);
+          return oldPinkEntity;          
+        }
+
+        const pinkEntity = this.pinkFreeEntities.values().next().value;
+        this.pinkFreeEntities.delete(pinkEntity);
+        this.pinkAllocatedEntities.add(pinkEntity);
+        const slimeObject = BehaviourFinder.GetBehaviour(pinkEntity) as unknown as ISlimeObject;
+        slimeObject?.onAllocate(position, rotation);
+        return pinkEntity;
+      } else if (type === SlimeType.King) {
+        if (this.kingFreeEntities.size == 0) {
+          const oldKingEntity = this.kingAllocatedEntities.values().next().value;                    
+          const slimeObject = BehaviourFinder.GetBehaviour(oldKingEntity) as unknown as ISlimeObject;
+          slimeObject.onFree();
+          slimeObject?.onAllocate(position, rotation);
+          return oldKingEntity;
+        }
+
+        const kingEntity = this.kingFreeEntities.values().next().value;
+        this.kingFreeEntities.delete(kingEntity);
+        this.kingAllocatedEntities.add(kingEntity);
+        const slimeObject = BehaviourFinder.GetBehaviour(kingEntity) as unknown as ISlimeObject;
+        slimeObject?.onAllocate(position, rotation);
+        return kingEntity;
+      }
+    } else {
+      if (type === SlimeType.Blue) {
+        this.world.spawnAsset(this.props.blueAsset!, position, rotation).then(([entity]) => {
+          this.addEntity(entity, true);
+          const slimeObject = BehaviourFinder.GetBehaviour(entity) as unknown as ISlimeObject;
+          if (slimeObject) {
+            slimeObject.onAllocate(position, rotation);
+          }
+        });
+      } else if (type === SlimeType.Pink) {
+        this.world.spawnAsset(this.props.pinkAsset!, position, rotation).then(([entity]) => {
+          this.addEntity(entity, true);
+          const slimeObject = BehaviourFinder.GetBehaviour(entity) as unknown as ISlimeObject;
+          if (slimeObject) {
+            slimeObject.onAllocate(position, rotation);
+          }
+        });
+      } else if (type === SlimeType.King) {
+        this.world.spawnAsset(this.props.kingAsset!, position, rotation).then(([entity]) => {
+          this.addEntity(entity, true);
+          const slimeObject = BehaviourFinder.GetBehaviour(entity) as unknown as ISlimeObject;
+          if (slimeObject) {
+            slimeObject.onAllocate(position, rotation);
+          }
+        });
+      }
+    }    
   }
 
-  public addEntity(entity : Entity){
-    console.log('addEntity: ', entity);
+  public addEntity(entity : Entity, isAllocated: boolean){    
     const slimeObject = BehaviourFinder.GetBehaviour(entity) as unknown as ISlimeObject;
     if (!slimeObject) {
       return;
     }
 
+    if (isAllocated) {
+      switch (slimeObject.slimeType) {
+        case SlimeType.Blue: this.blueAllocatedEntities.add(entity); break;
+        case SlimeType.Pink: this.pinkAllocatedEntities.add(entity); break;
+        case SlimeType.King: this.kingAllocatedEntities.add(entity); break;
+      }
+    } else {
+      switch (slimeObject.slimeType) {
+        case SlimeType.Blue: this.blueFreeEntities.add(entity); break;
+        case SlimeType.Pink: this.pinkFreeEntities.add(entity); break;
+        case SlimeType.King: this.kingFreeEntities.add(entity); break;
+      }
+    }
+
     switch (slimeObject.slimeType) {
-      case SlimeType.Blue:
-        this.blueFreeEntities.add(entity);
-
-        console.log('blueFreeEntities size: ', this.blueFreeEntities.size);
-        break;
-      case SlimeType.Pink:
-        this.pinkFreeEntities.add(entity);
-
-        console.log('pinkFreeEntities size: ', this.pinkFreeEntities.size);
-        break;
-      case SlimeType.King:
-        this.kingFreeEntities.add(entity);
-
-        console.log('kingFreeEntities size: ', this.kingFreeEntities.size);
-        break;
-    }      
+        case SlimeType.Blue: console.log(`Blue ${this.blueAllocatedEntities.size} + ${this.blueFreeEntities.size} / ${PullSize.Blue}`); break;
+        case SlimeType.Pink: console.log(`Pink ${this.pinkAllocatedEntities.size} + ${this.pinkFreeEntities.size} / ${PullSize.Pink}`); break;
+        case SlimeType.King: console.log(`King ${this.kingAllocatedEntities.size} + ${this.kingFreeEntities.size} / ${PullSize.King}`); break;
+      }
   }
 
   public isFull(type: SlimeType): boolean {
     switch (type) {
       case SlimeType.Blue:
-        return this.blueAllocatedEntities.size >= pullSize.blue;
+        return this.blueAllocatedEntities.size + this.blueFreeEntities.size >= PullSize.Blue;
       case SlimeType.Pink:
-        return this.pinkAllocatedEntities.size >= pullSize.pink;
+        return this.pinkAllocatedEntities.size + this.pinkFreeEntities.size >= PullSize.Pink;
       case SlimeType.King:
-        return this.kingAllocatedEntities.size >= pullSize.king;
-    }  
-    return false;
+        return this.kingAllocatedEntities.size + this.kingFreeEntities.size >= PullSize.King;
+    }      
   }
 
   public removeEntity(entity: Entity | undefined | null) {
