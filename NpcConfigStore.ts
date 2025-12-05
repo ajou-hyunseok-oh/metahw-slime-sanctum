@@ -9,6 +9,7 @@
 import { Behaviour } from "Behaviour";
 import { Component } from "horizon/core";
 import { NpcTuner } from "NpcTuner";
+import { SLIME_BASE_STATS } from "GameBalanceData";
 
 export class NpcConfigStore extends Behaviour<typeof NpcConfigStore>{
   public static instance: NpcConfigStore;
@@ -23,8 +24,23 @@ export class NpcConfigStore extends Behaviour<typeof NpcConfigStore>{
     this.npcConfigs.set(npcId, npcTuner);
   }
 
-  public getNpcConfig(npcId: string){
-    return this.npcConfigs.get(npcId)?.props;
+  public getNpcConfig(npcId: string) {
+    const tuner = this.npcConfigs.get(npcId);
+    if (!tuner) return undefined;
+
+    const props = tuner.props;
+    const baseStats = SLIME_BASE_STATS[npcId];
+
+    if (baseStats) {
+      // GameBalanceData에 정의된 스탯이 있으면 우선 사용
+      // LootTable 같은 엔티티 참조는 기존 props에서 유지
+      return {
+        ...props,
+        ...baseStats
+      };
+    }
+
+    return props;
   }
 }
 Component.register(NpcConfigStore);

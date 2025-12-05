@@ -3,7 +3,7 @@ import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
 import { Color, Component, Player, PropTypes, Quaternion, Vec3, Entity } from "horizon/core";
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
-import { NpcConfigStore } from "NpcConfigStore";
+import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 
@@ -32,8 +32,7 @@ export interface SlimeHealthSnapshot {
 
 export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeObject {
   static propsDefinition = {
-    agentFPS: { type: PropTypes.Number, default: 4 },
-    configName: { type: PropTypes.String, default: "default" },
+    agentFPS: { type: PropTypes.Number, default: 4 },    
     slimeType: { type: PropTypes.String, default: 'blue' },
     stoppingDistance: { type: PropTypes.Number, default: 1.5 },
     attackDistance: { type: PropTypes.Number, default: 2.0 },
@@ -94,15 +93,18 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
   protected targetPlayer: Player | undefined = undefined;
   private autoAcquireTimer: number = 0;
   
-  protected config: any = null;
+  protected config: SlimeStats | null = null;
   private owningPool: ObjectPool | null = null;
   private readonly poolRestingPosition: Vec3 = new Vec3(0, -9999, 0);
   private pendingRecycleHandle: number | null = null;
 
   Start() {
-    this.config = NpcConfigStore.instance.getNpcConfig(this.props.configName);
-    if (this.config === undefined) {
-      console.error("SlimeAgent::Start() Attempted to load config for undefined config name: " + this.props.configName);
+    // NpcConfigStore 대체: GameBalanceData 사용
+    this.config = SLIME_BASE_STATS[this.props.slimeType];
+    if (!this.config) {
+      console.error("SlimeAgent::Start() Attempted to load config for undefined config name: " + this.props.slimeType);
+      // Fallback
+      this.config = SLIME_BASE_STATS["default"];
     }
 
     this.navAgent = this.entity.as(NavMeshAgent)!;
@@ -567,7 +569,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     FloatingTextManager.instance?.createFloatingText(damage.toString(), hitPos, Color.red);
 
-    if (this.config && damage >= this.config.knockbackMinDamage) {
+    const npcConfig = this.config;
+    if (npcConfig && damage >= npcConfig.knockbackMinDamage) {
       var hitDirection = hitNormal.mul(-1);
       hitDirection.y = 0;
       hitDirection.normalize();
@@ -582,7 +585,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
             this.async.clearInterval(moveInterval);
             return;
         }
-        if (this.entity.position.get().sub(startPosition).magnitude() > damage * this.config.knockbackMultiplier) {
+        if (this.entity.position.get().sub(startPosition).magnitude() > damage * npcConfig.knockbackMultiplier) {
           this.async.clearInterval(moveInterval);
           // 넉백 종료 후 상태에 따라 네비게이션 복구는 onEnterState 등에서 처리되거나,
           // Hit 상태 종료 시점에 풀림

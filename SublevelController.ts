@@ -3,7 +3,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on December 04, 2025
+// Modified by Hyunseok Oh on December 06, 2025 
 
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, CodeBlockEvents, Entity, PropTypes, Player, SpawnPointGizmo, TriggerGizmo } from 'horizon/core';
@@ -56,25 +56,16 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
           this.completeLoading(players, false);
           return;
         }        
+
         // 주요 지점 검색
         const spotsReady = await this.findSpots(sublevel);
         this.sendLoadingProgress(players, 10);
-        await this.slimeSpawnController!.spawnSanctum(this.fixedSpawnEntities, this.spawnEntities, this.coreEntities[0]!, players, 10);
-        
+        await this.slimeSpawnController!.spawnSanctum(this.fixedSpawnEntities, this.spawnEntities, this.coreEntities[0]!, players, 10);        
         // 모든 스폰 완료 후 100% 전송
-        this.sendLoadingProgress(players, 100);
-        
-        this.teleportPlayersToStartingPoint(players, startingPoint.as(SpawnPointGizmo));
-        
+        this.sendLoadingProgress(players, 100);        
+        this.teleportPlayersToStartingPoint(players, startingPoint.as(SpawnPointGizmo));        
         // Trigger 활성화 (플레이어 도착 감지용)
-        this.props.startingZoneTrigger!.as(TriggerGizmo).enabled.set(true);
-
-        // SlimeSpawnController handles loading completion
-        // const loadSuccessful = !!spotsReady;
-        // this.completeLoading(players, loadSuccessful);
-
-        // 고정 카메라 연출 시작:  이벤트 발생
-        // 고정 카메리 연출이 끝나면 시작 지점 트리거 활성화 이벤트 진행
+        this.props.startingZoneTrigger!.as(TriggerGizmo).enabled.set(true);        
       })
       .catch((error) => {
         console.error(`[SublevelController] Failed to activate sublevel: ${error}`);
