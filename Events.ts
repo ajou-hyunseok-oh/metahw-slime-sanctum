@@ -61,6 +61,9 @@ export const Events = {
     slimeKills: number;
     wavesSurvived: number;
   }>('matchStateUpdate'),
+  
+  // Player HUD
+  playerHPUpdate: new NetworkEvent<{ current: number, max: number }>('playerHPUpdate'),
 };
 
 export const WaveManagerNetworkEvents = {

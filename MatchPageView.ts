@@ -23,6 +23,10 @@ const matchStateUpdateEvent = (Events as unknown as {
   matchStateUpdate: NetworkEvent<MatchStateUpdatePayload>;
 }).matchStateUpdate;
 
+const playerHPUpdateEvent = (Events as unknown as {
+  playerHPUpdate: NetworkEvent<{ current: number, max: number }>;
+}).playerHPUpdate;
+
 /**
  * This is an example of a NoesisUI component that can be used in a world.
  * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
@@ -54,6 +58,15 @@ class MatchPageView extends Component<typeof MatchPageView> {
         return;
       }
       this.onMatchStatsUpdated(payload);
+    });
+
+    this.connectNetworkEvent(localPlayer, playerHPUpdateEvent, (data) => {
+      const gizmo = this.entity.as(NoesisGizmo);
+      if (gizmo && gizmo.dataContext) {
+        gizmo.dataContext.CurrentHP = data.current;
+        gizmo.dataContext.MaxHP = data.max;
+        gizmo.dataContext.HPText = `${data.current}/${data.max}`;
+      }
     });
 
     this.setVisibility(false, localPlayer);

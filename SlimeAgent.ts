@@ -7,7 +7,7 @@ import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
-import { HPUpdateEvent } from "HPProgressView";
+import { EntityHPUpdateEvent } from "HPProgressView";
 
 export enum SlimeState {
   Idle = "Idle", 
@@ -62,6 +62,10 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
   // Animation Variables
   private currentAnimation: SlimeAnimation | null = null;
   private animSpeed: number = 0.0; 
+
+  private attackTimer: number = 0; // 공격 주기 타이머
+  private readonly attackInterval: number = 1.5; // 공격 주기 (초)
+  private readonly attackDamagePoint: number = 0.7; // 공격 애니메이션 중 데미지가 들어가는 시점 (초)
   
   private idleScaleActive: boolean = false;
   private idleScaleProgress: number = 0;
@@ -256,6 +260,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
       case SlimeState.Attack:
         this.navAgent?.isImmobile.set(true);
+        this.attackTimer = this.attackInterval - this.attackDamagePoint; // 첫 공격은 0.7초 후에 바로 나가도록 설정
         break;
 
       case SlimeState.Hit:
@@ -383,6 +388,38 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
       this.changeState(SlimeState.Move);
     } else {
       this.lookAtTarget(this.targetPlayer.position.get());
+      
+      // 공격 타이머 진행
+      this.attackTimer += deltaTime;
+      
+      // 공격 주기마다 데미지 입힘 (0.7초 시점에 공격)
+      if (this.attackTimer >= this.attackInterval) {
+          this.attackTimer = 0; // 타이머 초기화
+          
+          // 실제 데미지 적용
+          this.performAttack(this.targetPlayer);
+      }
+    }
+  }
+
+  private performAttack(target: Player) {
+    if (!this.config) return;
+    
+    // 공격력 랜덤 산출
+    const minDmg = this.config.minAttackDamage ?? 1;
+    const maxDmg = this.config.maxAttackDamage ?? 1;
+    const damage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+
+    // 플레이어에게 피격 이벤트 전송
+    this.sendNetworkBroadcastEvent(Events.playerHit, {
+        player: target,
+        damage: damage,
+        damageOrigin: this.entity.position.get()
+    });
+    
+    // 공격 SFX 재생
+    if (this.props.attackSFX) {
+        this.props.attackSFX.as(AudioGizmo)?.play();
     }
   }
 
@@ -639,7 +676,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: spawnHp, max: spawnHp });
+        this.sendNetworkEvent(uiEntity, EntityHPUpdateEvent, { current: spawnHp, max: spawnHp });
     }
     return spawnHp;
   }
@@ -653,7 +690,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
+        this.sendNetworkEvent(uiEntity, EntityHPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
     }
     return this.hitPoints;
   }
@@ -666,7 +703,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
+        this.sendNetworkEvent(uiEntity, EntityHPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
     }
     return this.hitPoints;
   }

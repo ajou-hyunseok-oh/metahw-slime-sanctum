@@ -7,7 +7,7 @@
 
 import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
-import { Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
+import { Component, NetworkEvent, Player, PropTypes, Vec3 } from 'horizon/core';
 import { getPlayerStats, PASSIVE_SKILL_DATA } from 'GameBalanceData';
 import { TeamType } from 'GameConstants';
 
@@ -38,6 +38,14 @@ const matchStateUpdateEvent = (Events as unknown as {
   matchStateUpdate: NetworkEvent<MatchStateUpdatePayload>;
 }).matchStateUpdate;
 
+const playerHPUpdateEvent = (Events as unknown as {
+  playerHPUpdate: NetworkEvent<{ current: number, max: number }>;
+}).playerHPUpdate;
+
+const playerHitEvent = (Events as unknown as {
+  playerHit: NetworkEvent<{ player: Player, damage: number, damageOrigin: Vec3 }>;
+}).playerHit;
+
 /**
  * 서버에서 플레이어별 매치 진행 상태(HP, 능력치, 진행 기록 등)를 일원화해 관리한다.
  * HP/공격 스탯은 반드시 이 매니저를 경유해 갱신해야 다른 시스템과 정합성이 보장된다.
@@ -61,6 +69,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
 
   protected Start() {
     this.connectNetworkBroadcastEvent(matchStateRequestEvent, this.onMatchStateRequested.bind(this));
+    this.connectNetworkBroadcastEvent(playerHitEvent, this.onPlayerHit.bind(this));
   }
 
   /**
@@ -336,6 +345,30 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
 
     const state = this.getOrCreateState(player);
     this.emitStateUpdate(player, state);
+  }
+
+  private onPlayerHit(data: { player: Player, damage: number, damageOrigin: Vec3 }) {
+    const player = data.player;
+    const rawDamage = data.damage;
+    
+    if (!player) return;
+
+    const state = this.getOrCreateState(player);
+    
+    // StarCraft Style Damage Formula
+    // Damage = Max(1, Attack - Armor)
+    const damage = Math.max(1, rawDamage - state.defense);
+    
+    // Apply Damage
+    this.adjustHp(player, -damage);
+    
+    console.log(`[MatchStateManager] Player ${player.name.get()} Hit! Raw: ${rawDamage}, Def: ${state.defense}, Final: ${damage}. HP: ${state.hpCurrent}/${state.hpMax}`);
+
+    if (state.hpCurrent <= 0) {
+       // 사망 처리 로직 (필요 시 구현)
+       // 예: Events.playerDeath 발송 등
+       // this.sendNetworkBroadcastEvent(Events.playerDeath, { player });
+    }
   }
 
   private clamp(value: number | undefined, min: number, max: number): number {

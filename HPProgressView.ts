@@ -4,7 +4,7 @@ import { NoesisGizmo } from 'horizon/noesis';
 /**
  * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
  */
-export const HPUpdateEvent = new NetworkEvent<{current: number, max: number}>("HPUpdateEvent");
+export const EntityHPUpdateEvent = new NetworkEvent<{current: number, max: number}>("EntityHPUpdateEvent");
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
@@ -38,7 +38,7 @@ export class HPProgressView extends Component<typeof HPProgressView> {
     // After a dataContext object is attached to a Noesis gizmo, it's automatically tracked for changes
     // so simply updating it will automatically update the UI.
     
-    this.connectNetworkEvent(this.entity, HPUpdateEvent, (data) => {
+    this.connectNetworkEvent(this.entity, EntityHPUpdateEvent, (data) => {
       this.updateHP(data.current, data.max);
     });
   }
