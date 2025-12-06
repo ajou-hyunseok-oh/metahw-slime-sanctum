@@ -7,6 +7,7 @@ import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
+import { HPUpdateEvent } from "HPProgressView";
 
 export enum SlimeState {
   Idle = "Idle", 
@@ -635,6 +636,11 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.maxHitPoints = spawnHp;
     this.hitPoints = spawnHp;
     this.publishHitPointsChanged();
+    
+    const uiEntity = this.props?.noesisUI;
+    if (uiEntity) {
+        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: spawnHp, max: spawnHp });
+    }
     return spawnHp;
   }
 
@@ -644,6 +650,11 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     const nextHp = Math.max(0, this.hitPoints - amount);
     this.hitPoints = nextHp;
     this.publishHitPointsChanged();
+
+    const uiEntity = this.props?.noesisUI;
+    if (uiEntity) {
+        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: this.hitPoints, max: this.maxHitPoints });
+    }
     return this.hitPoints;
   }
 
@@ -652,6 +663,11 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     const nextHp = Math.min(this.maxHitPoints, this.hitPoints + amount);
     this.hitPoints = nextHp;
     this.publishHitPointsChanged();
+
+    const uiEntity = this.props?.noesisUI;
+    if (uiEntity) {
+        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: this.hitPoints, max: this.maxHitPoints });
+    }
     return this.hitPoints;
   }
 
@@ -670,12 +686,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
   private rollSpawnHitPoints(): number {
     const minHpConfig = typeof this.config?.minHp === "number" ? this.config.minHp : 1;
-    const maxHpConfig = typeof this.config?.maxHp === "number" ? this.config.maxHp : minHpConfig;
-    const minHp = Math.max(1, minHpConfig);
-    const maxHp = Math.max(minHp, maxHpConfig);
-    if (maxHp === minHp) return minHp;
-    const range = maxHp - minHp;
-    return minHp + Math.floor(Math.random() * (range + 1));
+    return Math.max(1, minHpConfig);
   }
 
   private updateNavigationMovement() {
