@@ -639,7 +639,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: spawnHp, max: spawnHp });
+        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: spawnHp, max: spawnHp });
     }
     return spawnHp;
   }
@@ -653,7 +653,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: this.hitPoints, max: this.maxHitPoints });
+        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
     }
     return this.hitPoints;
   }
@@ -666,7 +666,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     const uiEntity = this.props?.noesisUI;
     if (uiEntity) {
-        this.sendNetworkBroadcastEvent(HPUpdateEvent, { targetId: uiEntity.id, current: this.hitPoints, max: this.maxHitPoints });
+        this.sendNetworkEvent(uiEntity, HPUpdateEvent, { current: this.hitPoints, max: this.maxHitPoints });
     }
     return this.hitPoints;
   }
