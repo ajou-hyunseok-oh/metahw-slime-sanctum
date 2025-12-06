@@ -14,6 +14,7 @@ import { CutsceneEvents } from 'SanctumCutscene';
 import { SlimeSpawnController } from 'SlimeSpawnController';
 import { MatchStateManager } from 'MatchStateManager';
 import { TeamType } from 'GameConstants';
+import { WeaponSelector, WeaponType } from 'WeaponSelector';
 
 export class SublevelController extends Behaviour<typeof SublevelController> {
   static propsDefinition = {
@@ -235,6 +236,25 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     PlayerManager.instance.setPlayerTeam(player, team);
     PlayerManager.instance.setPlayerMode(player, PlayerMode.Match);
 
+    // [매치 데이터 초기화 완료 시점]
+    // PlayerManager.setPlayerMode(..., Match) 내부에서 MatchStateManager.enterMatch()가 동기적으로 호출됩니다.
+    // 따라서 바로 아래 라인부터는 매치 데이터가 초기화된 상태입니다.
+    
+    // 예시: 초기화된 스탯 정보 확인 및 후속 로직 실행
+    const stats = MatchStateManager.instance.getStats(player);
+    if (stats) {
+      console.log(`[SublevelController] Match initialized for ${player.name.get()}. HP: ${stats.hpCurrent}/${stats.hpMax}`);
+      
+      // 1레벨 무기 지급 (임시: 무조건 Melee 1레벨)
+      if (WeaponSelector.Instance) {
+        WeaponSelector.Instance.grabWeapon(WeaponType.Melee, 1, player);
+      } else {
+        console.warn('[SublevelController] WeaponSelector instance not found.');
+      }
+    }
+
+
+    
     /*
     const cutsceneEntity = this.props.sanctumCutscene;
     if (!cutsceneEntity) {

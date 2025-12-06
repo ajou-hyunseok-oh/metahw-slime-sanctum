@@ -70,6 +70,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     const state = this.createInitialState(overrides);
     this.playerStates.set(player.id, state);
     this.emitStateUpdate(player, state);
+
     return state;
   }
 

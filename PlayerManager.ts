@@ -122,15 +122,6 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     }
   }
 
-  private grantMatchStartingWeapon(player: Player) {
-    if (!this.weaponSelector) {
-      console.warn('[PlayerManager] WeaponSelector가 준비되지 않았습니다.');
-      return;
-    }
-
-    this.weaponSelector.grabWeapon(WeaponType.Melee, 1, player);
-  }
-
   public getPlayerMode(player: Player): PlayerMode {
     return this.getOrCreatePlayerState(player).mode;
   }
