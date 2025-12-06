@@ -8,6 +8,8 @@
 import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
 import { Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
+import { getPlayerStats, PASSIVE_SKILL_DATA } from 'GameBalanceData';
+import { TeamType } from 'GameConstants';
 
 export type MatchVariables = {
   hpCurrent: number;
@@ -18,6 +20,12 @@ export type MatchVariables = {
   magicAttackLevel: number;
   slimeKills: number;
   wavesSurvived: number;
+  level: number;
+  currentXp: number;
+  xpToNextLevel: number;
+  team: TeamType;
+  skillHpBonusLevel: number;
+  skillDefenseBonusLevel: number;
 };
 
 export type MatchStateUpdatePayload = MatchVariables & { playerId: number };
@@ -38,9 +46,9 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   static propsDefinition = {
     defaultHpMax: { type: PropTypes.Number, default: 100 },
     defaultDefense: { type: PropTypes.Number, default: 0 },
-    defaultMeleeAttackLevel: { type: PropTypes.Number, default: 1 },
-    defaultRangedAttackLevel: { type: PropTypes.Number, default: 1 },
-    defaultMagicAttackLevel: { type: PropTypes.Number, default: 1 },
+    defaultMeleeAttackLevel: { type: PropTypes.Number, default: 0 },
+    defaultRangedAttackLevel: { type: PropTypes.Number, default: 0 },
+    defaultMagicAttackLevel: { type: PropTypes.Number, default: 0 },
   };
 
   static instance: MatchStateManager;
@@ -102,6 +110,11 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     merged.meleeAttackLevel = this.normalizeCombatLevel(merged.meleeAttackLevel);
     merged.rangedAttackLevel = this.normalizeCombatLevel(merged.rangedAttackLevel);
     merged.magicAttackLevel = this.normalizeCombatLevel(merged.magicAttackLevel);
+    
+    merged.level = Math.max(1, merged.level);
+    merged.currentXp = Math.max(0, merged.currentXp);
+    merged.xpToNextLevel = Math.max(1, merged.xpToNextLevel);
+
     this.playerStates.set(player.id, merged);
     this.emitStateUpdate(player, merged);
     return merged;
@@ -154,6 +167,95 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     return this.patchStats(player, { slimeKills: current.slimeKills + Math.max(0, kills) });
   }
 
+  public addXp(player: Player, amount: number): MatchVariables {
+    if (amount <= 0) return this.getOrCreateState(player);
+
+    let state = this.getOrCreateState(player);
+    let { level, currentXp, xpToNextLevel } = state;
+
+    currentXp += amount;
+    console.log(`[MatchStateManager] Player ${player.name.get()} gained ${amount} XP. Current: ${currentXp}/${xpToNextLevel}`);
+
+    let leveledUp = false;
+    // Level up loop
+    while (currentXp >= xpToNextLevel) {
+      currentXp -= xpToNextLevel;
+      level++;
+      
+      const nextStats = getPlayerStats(level);
+      xpToNextLevel = nextStats.xpToNextLevel;
+      
+      // Update state with new level first
+      state.level = level; 
+      
+      // Recalculate stats with new level (skill bonuses applied automatically)
+      const { maxHp, defense } = this.calculateStats(state.level, state.skillHpBonusLevel, state.skillDefenseBonusLevel);
+      
+      state.hpMax = maxHp;
+      state.hpCurrent = maxHp; // Full heal on level up
+      state.defense = defense;
+
+      leveledUp = true;
+      console.log(`[MatchStateManager] *** LEVEL UP! *** Player ${player.name.get()} is now Level ${level}! HP: ${maxHp}, Def: ${defense}`);
+    }
+
+    if (leveledUp) {
+       return this.patchStats(player, {
+        level,
+        currentXp,
+        xpToNextLevel,
+        hpMax: state.hpMax,
+        hpCurrent: state.hpCurrent,
+        defense: state.defense
+      });
+    } else {
+      return this.patchStats(player, {
+        currentXp
+      });
+    }
+  }
+
+  public upgradePassiveSkill(player: Player, skillType: 'hp' | 'defense'): MatchVariables {
+    const state = this.getOrCreateState(player);
+    const patch: Partial<MatchVariables> = {};
+
+    if (skillType === 'hp') {
+        const newLevel = state.skillHpBonusLevel + 1;
+        patch.skillHpBonusLevel = newLevel;
+        
+        // Recalculate HP immediately
+        const stats = this.calculateStats(state.level, newLevel, state.skillDefenseBonusLevel);
+        patch.hpMax = stats.maxHp;
+        // Proportionally increase current HP or keep same? Usually keep same or full heal. Let's keep current but clamp.
+        // Or increase current by the same amount max increased?
+        const hpIncrease = stats.maxHp - state.hpMax;
+        patch.hpCurrent = state.hpCurrent + hpIncrease;
+    } else if (skillType === 'defense') {
+        const newLevel = state.skillDefenseBonusLevel + 1;
+        patch.skillDefenseBonusLevel = newLevel;
+        
+        // Recalculate Defense
+        const stats = this.calculateStats(state.level, state.skillHpBonusLevel, newLevel);
+        patch.defense = stats.defense;
+    }
+
+    return this.patchStats(player, patch);
+  }
+
+  private calculateStats(level: number, hpSkillLevel: number, defSkillLevel: number) {
+    const baseStats = getPlayerStats(level);
+    
+    // Apply HP Bonus (Percentage)
+    const hpMultiplier = 1.0 + (hpSkillLevel * PASSIVE_SKILL_DATA.hpBonusPerLevel);
+    const finalMaxHp = Math.floor(baseStats.maxHp * hpMultiplier);
+
+    // Apply Defense Bonus (Flat)
+    const defBonus = defSkillLevel * PASSIVE_SKILL_DATA.defenseBonusPerLevel;
+    const finalDefense = baseStats.defense + defBonus;
+
+    return { maxHp: finalMaxHp, defense: finalDefense };
+  }
+
   public reset(player: Player): MatchVariables {
     const state = this.createInitialState();
     this.playerStates.set(player.id, state);
@@ -171,15 +273,27 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   private createInitialState(overrides?: Partial<MatchVariables>): MatchVariables {
+    const startStats = getPlayerStats(1);
+
+    // Initial Stats (Level 1 + 0 Skill Levels)
+    // Note: We use 0 for skills initially.
+    // calculateStats(1, 0, 0) would return base stats.
+    
     const base: MatchVariables = {
-      hpMax: this.props.defaultHpMax,
-      hpCurrent: this.props.defaultHpMax,
-      defense: this.props.defaultDefense,
+      hpMax: startStats.maxHp,
+      hpCurrent: startStats.maxHp,
+      defense: startStats.defense,
       meleeAttackLevel: this.props.defaultMeleeAttackLevel,
       rangedAttackLevel: this.props.defaultRangedAttackLevel,
       magicAttackLevel: this.props.defaultMagicAttackLevel,
       slimeKills: 0,
       wavesSurvived: 0,
+      level: 1,
+      currentXp: 0,
+      xpToNextLevel: startStats.xpToNextLevel,
+      team: TeamType.None,
+      skillHpBonusLevel: 0,
+      skillDefenseBonusLevel: 0,
     };
 
     const initial: MatchVariables = {
@@ -197,6 +311,10 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     initial.meleeAttackLevel = this.normalizeCombatLevel(initial.meleeAttackLevel);
     initial.rangedAttackLevel = this.normalizeCombatLevel(initial.rangedAttackLevel);
     initial.magicAttackLevel = this.normalizeCombatLevel(initial.magicAttackLevel);
+
+    initial.level = Math.max(1, initial.level);
+    initial.currentXp = Math.max(0, initial.currentXp);
+    initial.xpToNextLevel = Math.max(1, initial.xpToNextLevel);
 
     return initial;
   }
@@ -228,9 +346,9 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
 
   private normalizeCombatLevel(value: number | undefined): number {
     if (value === undefined || Number.isNaN(value)) {
-      return 1;
+      return 0;
     }
-    return Math.max(1, Math.floor(value));
+    return Math.max(0, Math.floor(value));
   }
 }
 

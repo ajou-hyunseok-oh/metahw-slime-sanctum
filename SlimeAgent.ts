@@ -6,6 +6,7 @@ import { INavMesh, NavMeshAgent } from "horizon/navmesh";
 import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
+import { MatchStateManager } from "MatchStateManager";
 
 export enum SlimeState {
   Idle = "Idle", 
@@ -559,6 +560,12 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     const remainingHp = this.applyDamage(clampedDamage);
     if (remainingHp <= 0) {
         this.changeState(SlimeState.Dead);
+        
+        // Give XP to the killer
+        if (MatchStateManager.instance && this.config) {
+           MatchStateManager.instance.addXp(data.fromPlayer, this.config.xpReward);
+           MatchStateManager.instance.incrementSlimeKills(data.fromPlayer);
+        }
     } else {
         this.changeState(SlimeState.Hit);
     }

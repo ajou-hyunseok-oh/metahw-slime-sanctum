@@ -75,11 +75,23 @@ class MatchPageView extends Component<typeof MatchPageView> {
     const dataContext = {
       CurrentHP: stats.hpCurrent,      
       MaxHP: stats.hpMax,
-      HPText: `${stats.hpCurrent}/${stats.hpMax}`,
-      MeleeLevel: stats.meleeAttackLevel,
-      RangedLevel: stats.rangedAttackLevel,
-      MagicLevel: stats.magicAttackLevel,
-      DefenceLevel: stats.defense,
+      HPText: `${stats.hpCurrent}/${stats.hpMax}`,      
+      HPLevel: `Lv ${stats.skillHpBonusLevel}`, // Added Passive Skill Level
+      CurrentXP: stats.currentXp,
+      MaxXP: stats.xpToNextLevel,
+      XPText: `${Math.floor((stats.currentXp / stats.xpToNextLevel) * 100)}%`,
+      MeleeLevel: `Lv ${stats.meleeAttackLevel}`,
+      RangedLevel: `Lv ${stats.rangedAttackLevel}`,
+      MagicLevel: `Lv ${stats.magicAttackLevel}`,
+      DefenceLevel: `Lv ${stats.skillDefenseBonusLevel}`, // Changed to show Skill Level      
+      WeaponType: "Melee",
+      WaveCount: stats.wavesSurvived === 0 ? `` : `Wave ${stats.wavesSurvived}`,
+      KilledSlimes: `Kills: ${stats.slimeKills}`,
+      events: {
+        swapWeapon: () => {
+          console.log("Swap Weapon");
+        },
+      }
     };
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
@@ -90,10 +102,18 @@ class MatchPageView extends Component<typeof MatchPageView> {
       CurrentHP: 0,
       MaxHP: 0,
       HPText: `${0}/${0}`,
-      DefenceLevel: 0,
-      MeleeLevel: 0,
-      RangedLevel: 0,
-      MagicLevel: 0
+      HPLevel: `Lv 0`,
+      HPSkillLevel: `Lv 0`,
+      CurrentXP: 0,
+      MaxXP: 0,
+      XPText: `0%`,
+      DefenceLevel: `Lv 0`,
+      DefenceValue: 0,
+      MeleeLevel: `Lv 0`,
+      RangedLevel: `Lv 0`,
+      MagicLevel: `Lv 0`,
+      WaveCount: `Wave 0`,
+      KilledSlimes: `Kills: 0`
     };
   }
 }

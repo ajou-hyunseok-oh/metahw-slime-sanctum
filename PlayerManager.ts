@@ -12,6 +12,7 @@ import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'hor
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 import { PlayerPersistentVariables, PersistentVariables } from 'PlayerPersistentVariables';
 import { MatchStateManager } from 'MatchStateManager';
+import { TeamType } from 'GameConstants';
 
 export enum PlayerMode {
   Lobby = "Lobby",
@@ -20,6 +21,7 @@ export enum PlayerMode {
 
 type ManagedPlayerState = {
   mode: PlayerMode;
+  team: TeamType;
 };
 
 const playerModeChangedEvent = (Events as unknown as {
@@ -89,10 +91,15 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     this.onPlayerModeChanged(player, mode);
   }
 
+  public setPlayerTeam(player: Player, team: TeamType) {
+    const state = this.getOrCreatePlayerState(player);
+    state.team = team;
+  }
+
   private getOrCreatePlayerState(player: Player): ManagedPlayerState {
     let state = this.playerStates.get(player.id);
     if (!state) {
-      state = { mode: PlayerMode.Lobby };
+      state = { mode: PlayerMode.Lobby, team: TeamType.None };
       this.playerStates.set(player.id, state);
     }
     return state;
@@ -101,14 +108,16 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   private onPlayerModeChanged(player: Player, mode: PlayerMode) {
     this.notifyPlayerMode(player, mode);
 
+    const state = this.getOrCreatePlayerState(player);
+
     switch (mode) {
       case PlayerMode.Lobby:
         console.log(`[PlayerManager] ${player.name.get()} -> Lobby`);
         this.matchStateManager?.exitMatch(player);
         break;
       case PlayerMode.Match:
-        console.log(`[PlayerManager] ${player.name.get()} -> Match`);
-        this.matchStateManager?.enterMatch(player);        
+        console.log(`[PlayerManager] ${player.name.get()} -> Match (Team: ${state.team})`);
+        this.matchStateManager?.enterMatch(player, { team: state.team });        
         break;
     }
   }

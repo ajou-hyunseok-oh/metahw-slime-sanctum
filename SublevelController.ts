@@ -12,6 +12,8 @@ import { PlayerManager, PlayerMode } from 'PlayerManager';
 import { LoadingStartEvent, LoadingProgressUpdateEvent, LoadingCompleteEvent } from 'LoadingEvents';
 import { CutsceneEvents } from 'SanctumCutscene';
 import { SlimeSpawnController } from 'SlimeSpawnController';
+import { MatchStateManager } from 'MatchStateManager';
+import { TeamType } from 'GameConstants';
 
 export class SublevelController extends Behaviour<typeof SublevelController> {
   static propsDefinition = {
@@ -19,6 +21,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     startingZoneTrigger: { type: PropTypes.Entity },
     sanctumCutscene: { type: PropTypes.Entity },
     slimeSpawnController: { type: PropTypes.Entity },
+    assignedTeam: { type: PropTypes.String, default: 'East' },
   };
 
   private coreEntities: Entity[] = [];
@@ -222,13 +225,24 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     // 플레이어가 시작 지점에 도착했으므로 로딩 완료 처리 (화면 닫기)
     this.sendNetworkEvent(player, LoadingCompleteEvent, {});
 
+    // 팀 할당 및 매치 시작
+    const teamStr = this.props.assignedTeam;
+    let team = TeamType.None;
+    if (teamStr === 'East') team = TeamType.East;
+    else if (teamStr === 'West') team = TeamType.West;
+    
+    console.log(`[SublevelController] Player ${player.name.get()} entered starting zone. Team: ${team}`);
+    PlayerManager.instance.setPlayerTeam(player, team);
+    PlayerManager.instance.setPlayerMode(player, PlayerMode.Match);
+
+    /*
     const cutsceneEntity = this.props.sanctumCutscene;
     if (!cutsceneEntity) {
       console.warn('SublevelController: sanctumCutscene prop missing');
       return;
     }
 
-    this.sendLocalEvent(cutsceneEntity, CutsceneEvents.OnStartCutscene, {player});
+    //this.sendLocalEvent(cutsceneEntity, CutsceneEvents.OnStartCutscene, {player});*/
   }
 }
 Component.register(SublevelController);

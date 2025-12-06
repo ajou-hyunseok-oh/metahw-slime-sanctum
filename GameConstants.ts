@@ -10,3 +10,9 @@ export const GameConstants = {
   AMMO_PER_BOX: 10,
   HEALTH_PER_POTION: 1,
 }
+
+export enum TeamType {
+  None = "None",
+  East = "East",
+  West = "West",
+}
