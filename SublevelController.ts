@@ -245,7 +245,10 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     if (stats) {
       console.log(`[SublevelController] Match initialized for ${player.name.get()}. HP: ${stats.hpCurrent}/${stats.hpMax}`);
       
-      // 1레벨 무기 지급 (임시: 무조건 Melee 1레벨)
+      // 플레이어의 근접 공격 레벨을 1로 설정 (무기 지급 조건 충족)
+      MatchStateManager.instance.setCombatAttributes(player, { meleeAttackLevel: 1 });
+
+      // 1레벨 무기 지급
       if (WeaponSelector.Instance) {
         WeaponSelector.Instance.grabWeapon(WeaponType.Melee, 1, player);
       } else {

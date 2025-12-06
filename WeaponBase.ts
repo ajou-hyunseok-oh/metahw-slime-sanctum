@@ -19,7 +19,6 @@ const playerModeRequestEvent = (Events as unknown as {
 
 export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
   static propsDefinition = {
-    attackCooldownMs: { type: hz.PropTypes.Number, default: 500 },
   };
 
   protected localPlayer: hz.Player | undefined;
@@ -51,7 +50,7 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
   }
 
   protected getAttackCooldownMs(): number {
-    return this.props.attackCooldownMs ?? WeaponBase.propsDefinition.attackCooldownMs.default;
+    return 500;
   }
 
   protected onAttackTriggered(player: hz.Player) {

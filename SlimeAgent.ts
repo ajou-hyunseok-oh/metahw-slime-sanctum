@@ -1,7 +1,7 @@
 import { Behaviour } from "Behaviour";
 import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
-import { Color, Component, Player, PropTypes, Quaternion, Vec3, Entity } from "horizon/core";
+import { Color, Component, Player, PropTypes, Quaternion, Vec3, Entity, AudioGizmo, ParticleGizmo } from "horizon/core";
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
 import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
@@ -38,7 +38,14 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     stoppingDistance: { type: PropTypes.Number, default: 1.5 },
     attackDistance: { type: PropTypes.Number, default: 2.0 },
     model: { type: PropTypes.Entity }, 
-    collider: { type: PropTypes.Entity }, 
+    collider: { type: PropTypes.Entity },        
+    attackSFX: { type: PropTypes.Entity },
+    dieSFX: { type: PropTypes.Entity },
+    hitSFX: { type: PropTypes.Entity },
+    hitVFX: { type: PropTypes.Entity },
+    hitMagicVFX: { type: PropTypes.Entity },
+    dieVFX: { type: PropTypes.Entity },
+    noesisUI: { type: PropTypes.Entity },
   };
 
   public slimeType: SlimeType = SlimeType.Blue;
@@ -145,8 +152,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     this.entity.position.set(position);
     this.entity.rotation.set(rotation);
-    this.setModelVisibility(true);
-    this.props.collider?.collidable.set(true);
+    this.setModelVisibility(true);    ;
     
     this.isDead = false;
     this.targetPlayer = owner ?? undefined;
@@ -188,8 +194,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
   private moveEntityToPoolRestingState() {
     this.entity.position.set(this.poolRestingPosition);
-    this.navAgent?.isImmobile.set(true);
-    this.props.collider?.collidable.set(false);
+    this.navAgent?.isImmobile.set(true);    
     this.setModelVisibility(false);
     this.targetPlayer = undefined;
     this.nextTarget = undefined;
@@ -200,6 +205,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
   protected setModelVisibility(visible: boolean) {
     this.entity.visible.set(visible);
+    this.props.collider?.collidable.set(visible);
+    this.props.noesisUI?.visible.set(visible);
   }
 
   Update(deltaTime: number) {
@@ -257,8 +264,16 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
       case SlimeState.Dead:
         this.navAgent?.isImmobile.set(true);
-        this.isDead = true;
-        this.props.collider?.collidable.set(false);
+        this.isDead = true;        
+        this.setModelVisibility(false);        
+        
+        if (this.props.dieSFX) {
+          this.props.dieSFX.as(AudioGizmo)?.play();
+        }
+        if (this.props.dieVFX) {
+          this.props.dieVFX.as(ParticleGizmo)?.play();
+        }
+
         this.recycleSelf(2000);
         break;
 
@@ -576,8 +591,18 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     FloatingTextManager.instance?.createFloatingText(damage.toString(), hitPos, Color.red);
 
+    if (this.props.hitSFX) {      
+      this.props.hitSFX.as(AudioGizmo)?.play();
+    }
+
+    if (this.props.hitVFX) {      
+      this.props.hitVFX.as(ParticleGizmo)?.play();
+    }
+    /*
     const npcConfig = this.config;
-    if (npcConfig && damage >= npcConfig.knockbackMinDamage) {
+    // 넉백 기능 비활성화 (조건문이 항상 false가 되도록 주석 처리 또는 수정)
+    /*
+    if (npcConfig && damage >= npcConfig.knockbackMinDamage && false) {
       var hitDirection = hitNormal.mul(-1);
       hitDirection.y = 0;
       hitDirection.normalize();
@@ -602,6 +627,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
         }
       }, 10);
     }
+    */
   }
 
   protected seedHitPointsFromConfig(): number {

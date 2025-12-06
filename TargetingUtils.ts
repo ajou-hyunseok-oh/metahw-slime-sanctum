@@ -1,38 +1,24 @@
 import * as hz from 'horizon/core';
-import { NpcAgent } from 'NpcAgent';
+import { SlimeAgent } from 'SlimeAgent';
 
-type AnyNpcAgent = NpcAgent<any>;
+type AnySlimeAgent = SlimeAgent;
 
 const DEG_TO_RAD = Math.PI / 180;
 const EPSILON = 1e-4;
-const SLIME_CONFIG_NAMES = new Set(['SlimeBlue', 'SlimePink', 'SlimeKing']);
-const SLIME_CLASS_NAMES = new Set(['SlimeBlueBrain', 'SlimePinkBrain', 'SlimeKingBrain']);
-const SLIME_TAG = 'SLIME';
 
-export type TargetingFilter = (agent: AnyNpcAgent) => boolean;
+export type TargetingFilter = (agent: AnySlimeAgent) => boolean;
 
-export function isSlimeAgent(agent: AnyNpcAgent): boolean {
-  if (entityHasTag(agent, SLIME_TAG)) {
-    return true;
-  }
-
-  const ctorName = agent.constructor?.name;
-  if (typeof ctorName === 'string' && SLIME_CLASS_NAMES.has(ctorName)) {
-    return true;
-  }
-
-  const configName = (agent.props as { configName?: string } | undefined)?.configName;
-  if (typeof configName === 'string' && SLIME_CONFIG_NAMES.has(configName)) {
-    return true;
-  }
-
-  return false;
+export function isSlimeAgent(agent: AnySlimeAgent): boolean {
+  // Since we iterate over SlimeAgent.getActiveAgents(), 
+  // we can assume the type is correct. 
+  // Add specific checks here if you want to filter specific slime types or states.
+  return true;
 }
 
 export const slimeTargetFilter: TargetingFilter = (agent) => isSlimeAgent(agent);
 
 export type TargetCandidate = {
-  agent: AnyNpcAgent;
+  agent: AnySlimeAgent;
   position: hz.Vec3;
   delta: hz.Vec3;
   horizontalDistanceSq: number;
@@ -131,7 +117,8 @@ function collectPreparedTargets(prepared: PreparedParams): TargetCandidate[] {
   const limit = prepared.maxTargets ? Math.max(1, Math.floor(prepared.maxTargets)) : undefined;
   const filter = prepared.filter ?? (() => true);
 
-  for (const agent of NpcAgent.getActiveAgents()) {
+  // CHANGED: Iterate over SlimeAgent instead of NpcAgent
+  for (const agent of SlimeAgent.getActiveAgents()) {
     if (agent.isDead) {
       continue;
     }
@@ -188,39 +175,6 @@ function normalizeFlatForward(forward: hz.Vec3): hz.Vec3 | null {
   return flatForward;
 }
 
-type TagSetLike = {
-  has(value: string): boolean;
-};
-
-function entityHasTag(agent: AnyNpcAgent, tag: string): boolean {
-  try {
-    const tags = agent.entity.tags;
-    if (!tags) {
-      return false;
-    }
-    if (isTagSetLike(tags)) {
-      return tags.has(tag);
-    }
-    if (Array.isArray(tags)) {
-      return tags.includes(tag);
-    }
-    if (isTagRecord(tags)) {
-      return Boolean(tags[tag]);
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-function isTagSetLike(value: unknown): value is TagSetLike {
-  return Boolean(value) && typeof (value as TagSetLike).has === 'function';
-}
-
-function isTagRecord(value: unknown): value is Record<string, boolean | undefined> {
-  return typeof value === 'object' && value !== null;
-}
-
 function getNormalizedDot(forward: hz.Vec3, deltaX: number, deltaZ: number, horizontalDistanceSq: number): number {
   if (horizontalDistanceSq <= EPSILON) {
     return 1;
@@ -228,4 +182,3 @@ function getNormalizedDot(forward: hz.Vec3, deltaX: number, deltaZ: number, hori
   const invDistance = 1 / Math.sqrt(horizontalDistanceSq);
   return (deltaX * forward.x + deltaZ * forward.z) * invDistance;
 }
-
