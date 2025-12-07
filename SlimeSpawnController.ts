@@ -8,7 +8,7 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, Player, PropTypes, Quaternion, Vec3 } from 'horizon/core';
 import { SlimeObjectPool, SlimeType, PullSize } from 'SlimeObjectPool';
-import { LoadingProgressUpdateEvent } from 'LoadingEvents';
+import { Events } from 'Events';
 
 export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController> {
   static propsDefinition = {
@@ -48,10 +48,7 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
         currentProgress += step;
         // 99%까지만 진행, 100%는 텔레포트 직전에 SublevelController에서 처리
         const displayProgress = Math.min(Math.floor(currentProgress), 99);
-
-        players.forEach(player => {
-          this.sendNetworkEvent(player, LoadingProgressUpdateEvent, { progress: displayProgress });
-        });
+        players.forEach(player => { this.sendNetworkEvent(player, Events.loadingProgressUpdate, { progress: displayProgress }); });
 
         // Small delay for visual effect
         await new Promise(resolve => this.async.setTimeout(resolve, 100)); 
@@ -79,9 +76,7 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
       }
 
       currentProgress += step;
-      players.forEach(player => {
-        this.sendNetworkEvent(player, LoadingProgressUpdateEvent, { progress: Math.min(Math.floor(currentProgress), 99) });
-      });
+      players.forEach(player => { this.sendNetworkEvent(player, Events.loadingProgressUpdate, { progress: Math.min(Math.floor(currentProgress), 99) }); });
 
       await new Promise(resolve => this.async.setTimeout(resolve, 100));
     }

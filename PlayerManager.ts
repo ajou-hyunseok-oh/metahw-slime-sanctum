@@ -130,25 +130,18 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     switch (mode) {
       case PlayerMode.Lobby:        
         this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: true});
-        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});        
+        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});
+        this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Lobby' });
         this.matchStateManager?.exitMatch(player);
         break;
       case PlayerMode.Match:
         const team = this.getPlayerTeam(player);        
         this.matchStateManager?.enterMatch(player, { team: team });        
         this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
-        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: true});        
+        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: true});
+        this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Match' });
         break;
     }
-  }
-
-  private onPlayerModeRequest(data: { playerId: number }) {
-    const player = this.world.getPlayers().find((p) => p.id === data.playerId);
-    if (!player) {
-      return;
-    }
-
-    const mode = this.getPlayerMode(player);
   }
 
   public getPersistentStats(player: Player): PersistentVariables | null {

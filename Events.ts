@@ -41,6 +41,9 @@ export const Events = {
     killedSlimes: number;
   }>('playerPersistentStatsUpdate'),
 
+  // Loading
+  loadingProgressUpdate: new NetworkEvent<{ progress: number }>('loadingProgressUpdate'),
+
 
 
 
@@ -52,7 +55,6 @@ export const Events = {
   playerLevelUp: new NetworkEvent<{player: Player, level: number, xp: number}>('playerLevelUp'),
   playerShowResults: new NetworkEvent<{player: Player, score: number, placement?: number}>('playerShowResults'),
   playerModeChanged: new NetworkEvent<{ mode: string }>('playerModeChanged'),
-  playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),  
   matchStateRequest: new NetworkEvent<{ playerId: number }>('matchStateRequest'),
   matchStateUpdate: new NetworkEvent<{
     playerId: number;
@@ -70,7 +72,7 @@ export const Events = {
   playerHPUpdate: new NetworkEvent<{ current: number, max: number }>('playerHPUpdate'),
 
   // Audio
-  playClientAudio: new NetworkEvent<{ playerId: number, soundId: string }>('playClientAudio'),
+  playerAudioRequest: new NetworkEvent<{ player: Player, soundId: string }>('playerAudioRequest'),
 
   // Game Flow
   requestMatchExit: new NetworkEvent<{ playerId: number }>('requestMatchExit'),

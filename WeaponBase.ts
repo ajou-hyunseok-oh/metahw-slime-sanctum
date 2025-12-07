@@ -6,23 +6,12 @@
 // Modified by Hyunseok Oh on December 01, 2025
 
 import * as hz from 'horizon/core';
-import { Events } from 'Events';
-import { PlayerMode } from 'PlayerManager';
-
-const playerModeChangedEvent = (Events as unknown as {
-  playerModeChanged: hz.NetworkEvent<{ mode: string }>;
-}).playerModeChanged;
-
-const playerModeRequestEvent = (Events as unknown as {
-  playerModeRequest: hz.NetworkEvent<{ playerId: number }>;
-}).playerModeRequest;
 
 export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
   static propsDefinition = {
   };
 
   protected localPlayer: hz.Player | undefined;
-  private currentMode: PlayerMode | undefined;
   private lastAttackMs = 0;
 
   start() {
@@ -36,8 +25,6 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
       return;
     }
 
-    this.connectNetworkEvent(this.localPlayer, playerModeChangedEvent, ({ mode }) => this.handlePlayerModeChanged(mode));
-    this.requestPlayerMode();
     this.registerInputEvents();
   }
 
@@ -59,6 +46,7 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
 
   private registerInputEvents() {
     this.connectCodeBlockEvent(this.entity, hz.CodeBlockEvents.OnIndexTriggerDown, (player: hz.Player) => {
+      console.log(`[WeaponBase] OnIndexTriggerDown: ${player.name.get()}`);
       if (!this.localPlayer || player.id !== this.localPlayer.id) {
         return;
       }
@@ -68,6 +56,7 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
   }
 
   private handleAttackInput(player: hz.Player) {
+    console.log(`[WeaponBase] handleAttackInput ${player.name.get()}`);
     if (!this.canAttack()) {
       return;
     }
@@ -84,7 +73,7 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
   }
 
   private canAttack(): boolean {
-    return this.localPlayer !== undefined && this.currentMode === PlayerMode.Match;
+    return this.localPlayer !== undefined;
   }
 
   private playAttackAnimation(player: hz.Player) {
@@ -93,24 +82,6 @@ export abstract class WeaponBase extends hz.Component<typeof WeaponBase> {
     } catch (error) {
       console.warn(`${this.getWeaponLogPrefix()} Failed to play attack animation:`, error);
     }
-  }
-
-  private handlePlayerModeChanged(mode: string) {
-    if (mode === PlayerMode.Match) {
-      this.currentMode = PlayerMode.Match;
-    } else if (mode === PlayerMode.Lobby) {
-      this.currentMode = PlayerMode.Lobby;
-    } else {
-      this.currentMode = undefined;
-    }
-  }
-
-  private requestPlayerMode() {
-    if (!this.localPlayer) {
-      return;
-    }
-
-    this.sendNetworkBroadcastEvent(playerModeRequestEvent, { playerId: this.localPlayer.id });
   }
 
   private isLocalContext(): boolean {

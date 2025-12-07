@@ -7,17 +7,10 @@
 
 import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-import { LoadingStartEvent, LoadingProgressUpdateEvent, LoadingCompleteEvent } from 'LoadingEvents';
+import { Events } from 'Events';
 
-/**
- * This is an example of a NetworkEvent that can be used to send data from the server to the clients.
- */
-const LoadingPageViewEvent = new NetworkEvent<{enabled: boolean}>("LoadingPageViewEvent");
+export const LoadingPageViewEvent = new NetworkEvent<{enabled: boolean}>("LoadingPageViewEvent");
 
-/**
- * This is an example of a NoesisUI component that can be used in a world.
- * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
- */
 class LoadingPageView extends Component<typeof LoadingPageView> {
 
   start() {
@@ -29,10 +22,7 @@ class LoadingPageView extends Component<typeof LoadingPageView> {
   }
 
   private startServer() {
-    // Noesis dataContext can't be directly controlled from the server
-    // but server can send events to the clients so that they would update their dataContexts accordingly
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
       this.sendNetworkEvent(player, LoadingPageViewEvent, {enabled: false});
     });
   }
@@ -46,27 +36,25 @@ class LoadingPageView extends Component<typeof LoadingPageView> {
     this.entity.as(NoesisGizmo).dataContext = dataContext;
 
     this.connectNetworkEvent(this.world.getLocalPlayer(), LoadingPageViewEvent, data => {
+
+      console.log(`[LoadingPageView] received event: ${this.world.getLocalPlayer().name.get()} / enabled: ${data.enabled}`);
+
+
+      if (data.enabled) {
+        dataContext.LoadingProgressValue = 0;
+        dataContext.LoadingProgressText = "Loading... 0%";
+      } else {
+        dataContext.LoadingProgressValue = 100;
+        dataContext.LoadingProgressText = "Loading... 100%";        
+      }
+
       this.setVisibility(data.enabled);
     });
-
-    // [로딩 시작]
-    this.connectNetworkEvent(this.world.getLocalPlayer(), LoadingStartEvent, () => {
-      this.setVisibility(true);
-      dataContext.LoadingProgressValue = 0;
-      dataContext.LoadingProgressText = "Loading... 0%";          
-    });
     
-    
-    this.connectNetworkEvent(this.world.getLocalPlayer(), LoadingProgressUpdateEvent, (data) => {          
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.loadingProgressUpdate, (data) => {          
       dataContext.LoadingProgressValue = data.progress;
       dataContext.LoadingProgressText = `Loading... ${data.progress}%`;
-    });
-    
-    // [로딩 완료]
-    this.connectNetworkEvent(this.world.getLocalPlayer(), LoadingCompleteEvent, () => {
-      dataContext.LoadingProgressText = `Loading... 100%`;
-      this.setVisibility(false);
-    });
+    });      
   }
 
   private setVisibility(enabled: boolean) {

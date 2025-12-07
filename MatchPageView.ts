@@ -54,8 +54,7 @@ class MatchPageView extends Component<typeof MatchPageView> {
   private startServer() {
     // Noesis dataContext can't be directly controlled from the server
     // but server can send events to the clients so that they would update their dataContexts accordingly
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
       this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});
     });
   }
@@ -74,14 +73,14 @@ class MatchPageView extends Component<typeof MatchPageView> {
       MagicLevel: `Lv 0`,
       DefenceLevel: `Lv 0`, // Changed to show Skill Level      
       WeaponType: "Melee",
-      WaveCount: `Wave 0`,
+      WaveCount: ``,
       KilledSlimes: `Kills: 0`,
       events: {
         swapWeapon: () => {
-          console.log("Fire Event: Swap Weapon");
+          console.log("[MatchPageView] Fire Event: Swap Weapon");
         },
         exit: () => {          
-          console.log("Fire Event: Exit");
+          console.log("[MatchPageView] Fire Event: Exit");
         }
       }
     };

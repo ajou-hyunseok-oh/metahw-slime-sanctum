@@ -136,7 +136,7 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     if (this.isMatchStarted) return;
 
     this.isMatchStarted = true;
-    this.broadcastState(); // 매치 시작 알림
+    this.broadcastState(); // 매치 시작 알림    
     this.loadSublevel();     
   }
 
@@ -201,7 +201,21 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     }
   }
 
-  // ... (기존 loadSublevel, finishMatch 등은 그대로 유지) ...  
+  private finishMatch() {
+    this.isMatchStarted = false;
+    // 매치 종료 시 상태 업데이트 필요 (선택 사항)
+    // this.broadcastState(); 
+    this.playersInTeam.forEach((player) => {
+      // 로비로 이동
+      const spawnGizmo = this.props.lobbySpawnPoint!.as(SpawnPointGizmo);
+      if (spawnGizmo) {
+        spawnGizmo.teleportPlayer(player);
+      }
+
+      PlayerManager.instance.setPlayerMode(player, PlayerMode.Lobby);
+    });
+  }
+  
   private loadSublevel() {
     const controllerEntity = this.props.sublevelControl;
     if (!controllerEntity) {
