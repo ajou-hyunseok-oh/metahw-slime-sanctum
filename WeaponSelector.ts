@@ -3,11 +3,12 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on November 30, 2025
+// Modified by Hyunseok Oh on December 06, 2025
 
 import { Behaviour } from 'Behaviour';
 import { Asset, Component, Entity, GrabbableEntity, Handedness, NetworkEvent, Player, PropTypes, Space } from 'horizon/core';
 import { WeaponType } from 'GameBalanceData';
+import { Events } from 'Events';
 
 export { WeaponType } from 'GameBalanceData';
 
@@ -121,6 +122,15 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
 
       this.forceEquip(grabbable, player);
       this.playerStates.set(playerId, { entities: spawnedEntities, grabbable });
+
+      // 무기 장착 이벤트 전송 (의상 변경 등을 위해)
+      this.sendNetworkBroadcastEvent(Events.weaponEquipped, {
+        player: player,
+        weaponKey: this.getAssetKey(weaponType, level) ?? "",
+        weaponType: weaponType,
+        isRightHand: true 
+      });
+
     } catch (error) {
       console.error('[WeaponSelector] 무기 스폰 실패:', error);
     }

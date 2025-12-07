@@ -116,6 +116,10 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     return this.getPlayerState(player).team;
   }
 
+  public getTeamPlayers(team: TeamType): Player[] {
+    return this.world.getPlayers().filter(p => this.getPlayerTeam(p) === team);
+  } 
+
   public setPlayerTeam(player: Player, team: TeamType) {
     const state = this.getPlayerState(player);
     state.team = team;
@@ -123,7 +127,8 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
   private onPlayerModeChanged(player: Player, mode: PlayerMode) {    
     switch (mode) {
-      case PlayerMode.Lobby:        
+      case PlayerMode.Lobby:
+        this.setPlayerTeam(player, TeamType.None); // 팀 정보 초기화
         this.sendNetworkEvent(player, Events.lobbyPageView, {enabled: true});
         this.sendNetworkEvent(player, Events.matchPageView, {enabled: false});
         this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Lobby' });

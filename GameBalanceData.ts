@@ -14,7 +14,8 @@ export type WavePlan = {
   healthScaling: number;  
 };
 
-export const WAVE_DURATION_SECONDS = 300;
+export const WAVE_CORE_HP = 10000;
+export const WAVE_DURATION_SECONDS = 10;
 export const WAVE_DATA: WavePlan[] = [
   { wave: 1, pinkChance: 0.05, kingChance: 0.0, intervalSeconds: 45, modelScaling: 1.0, damageScaling: 1.0, healthScaling: 1.0 },
   { wave: 2, pinkChance: 0.08, kingChance: 0.0, intervalSeconds: 42, modelScaling: 1.05, damageScaling: 1.05, healthScaling: 1.05 },

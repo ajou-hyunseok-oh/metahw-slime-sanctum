@@ -104,8 +104,19 @@ class MatchPageView extends Component<typeof MatchPageView> {
       dataContext.MagicLevel = `Lv ${payload.magicAttackLevel}`;
       dataContext.DefenceLevel = `Lv ${payload.skillDefenseBonusLevel}`;
       dataContext.WeaponType = "Melee";
-      dataContext.WaveCount = payload.wavesSurvived === 0 ? `` : `Wave ${payload.wavesSurvived}`;
+      // dataContext.WaveCount = payload.wavesSurvived === 0 ? `` : `Wave ${payload.wavesSurvived}`;
       dataContext.KilledSlimes = `Kills: ${payload.slimeKills}`;
+    });
+
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.waveStart, (data) => {
+      console.log("[MatchPageView] Wave Start: ", data);
+        // 웨이브 시작 시 3초간 웨이브 텍스트 표시
+        dataContext.WaveCount = `Wave ${data.wave}`;
+        
+        // 3초 후 텍스트 숨김 (클라이언트 사이드 타이머)
+        this.async.setTimeout(() => {
+             dataContext.WaveCount = "";
+        }, 3000);
     });
   }
 }

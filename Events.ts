@@ -99,6 +99,15 @@ export const Events = {
 
   loadingProgressUpdate: new NetworkEvent<{ progress: number }>('loadingProgressUpdate'),
   
+  // =================================================================================
+  // Wave & Sanctum Events
+  // =================================================================================
+  waveStart: new NetworkEvent<{ wave: number, remainingSeconds: number }>('waveStart'),
+  waveTimeUpdate: new NetworkEvent<{ remainingSeconds: number }>('waveTimeUpdate'),
+  waveClear: new NetworkEvent<{ wave: number }>('waveClear'),
+  coreUnderAttack: new NetworkEvent<{ currentHp: number, maxHp: number }>('coreUnderAttack'),
+  coreDestroyed: new NetworkEvent<{}>('coreDestroyed'),
+
   playerAudioRequest: new NetworkEvent<{ player: Player, soundId: string }>('playerAudioRequest'),
   
   // =================================================================================

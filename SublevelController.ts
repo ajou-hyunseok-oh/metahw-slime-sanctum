@@ -49,7 +49,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       console.warn(`[SublevelController] No valid SublevelEntity assigned!`);
       return;
     }
-
+    
     players.forEach((player) => { this.sendNetworkEvent(player, LoadingPageViewEvent, { enabled: true }); });
 
     this.props.startingZoneTrigger!.as(TriggerGizmo).enabled.set(false);
@@ -203,7 +203,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
 
     players.forEach((player) => {
       startingPoint.teleportPlayer(player);
-      PlayerManager.instance.setPlayerMode(player, PlayerMode.Match);
+      // PlayerManager.instance.setPlayerMode(player, PlayerMode.Match); // onPlayerEnterStartingZone에서 처리하도록 주석 처리
     });
   }
 
