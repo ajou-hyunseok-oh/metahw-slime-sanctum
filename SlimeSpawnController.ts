@@ -10,7 +10,7 @@ import { Component, Entity, Player, PropTypes, Quaternion, Vec3 } from 'horizon/
 import { SlimeObjectPool, SlimeType, PullSize } from 'SlimeObjectPool';
 import { Events } from 'Events';
 import { WavePlan } from 'GameBalanceData';
-import { SlimeAgent } from 'SlimeAgent';
+import { SlimeAgent, SlimeState } from 'SlimeAgent';
 
 export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController> {
   static propsDefinition = {
@@ -74,6 +74,15 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
     const activeAgents = SlimeAgent.getActiveAgents();
     // 죽지 않은 슬라임만 카운트
     return activeAgents.filter(agent => !agent.isDead).length;
+  }
+
+  public killAllSlimes() {
+    const activeAgents = SlimeAgent.getActiveAgents();
+    activeAgents.forEach(agent => {
+        if (!agent.isDead) {
+            agent.changeState(SlimeState.Dead);
+        }
+    });
   }
 
   private determineSlimeType(plan: WavePlan): SlimeType {

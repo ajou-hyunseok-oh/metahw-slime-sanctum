@@ -1,5 +1,5 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
-import { CodeBlockEvents, Component, Entity, Player, PropTypes, NetworkEvent } from 'horizon/core';
+import { CodeBlockEvents, Component, Entity, Player, PropTypes, NetworkEvent, AudioGizmo, ParticleGizmo } from 'horizon/core';
 import { SlimeSpawnController } from 'SlimeSpawnController';
 import { WAVE_DATA, WAVE_DURATION_SECONDS, WavePlan, WAVE_CORE_HP } from 'GameBalanceData';
 import { Events } from 'Events';
@@ -37,8 +37,9 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   
   preStart() {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterTrigger, this.OnPlayerEnterTrigger.bind(this));
-    this.connectNetworkEvent(this.entity, Events.coreDestroyed, this.OnCoreDestroyed.bind(this));
+    this.connectNetworkBroadcastEvent(Events.coreDestroyed, this.OnCoreDestroyed.bind(this));
     this.connectNetworkEvent(this.entity, Events.gameReset, this.ResetGame.bind(this));
+    this.connectNetworkBroadcastEvent(Events.coreHit, this.OnCoreHit.bind(this));
   }
 
   start() {
@@ -141,9 +142,52 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     });
   }
 
+  private OnCoreHit(data: { damage: number }) {
+    if (this.currentState !== WaveState.WaveRunning && this.currentState !== WaveState.CoreTargeting) return;
+    if (this.currentCoreHP <= 0) return;
+
+    this.currentCoreHP = Math.max(0, this.currentCoreHP - data.damage);
+    
+    // UI Update
+    const coreNoesisUIEntity = this.props.coreNoesisUIEntity;
+    if (coreNoesisUIEntity) {
+        const scaledCurrent = (this.currentCoreHP / WAVE_CORE_HP) * 100;
+        this.sendNetworkEvent(coreNoesisUIEntity, EntityHPUpdateEvent, { current: scaledCurrent, max: 100 });
+    }
+
+    // Broadcast Under Attack (Visuals/Sound)
+    this.sendNetworkBroadcastEvent(Events.coreUnderAttack, { currentHp: this.currentCoreHP, maxHp: WAVE_CORE_HP });
+
+    if (this.currentCoreHP <= 0) {
+        this.sendNetworkBroadcastEvent(Events.coreDestroyed, {});
+        this.OnCoreDestroyed();
+    }
+  }
+
   private OnCoreDestroyed() {
     console.log("[WavePlayer] Core destroyed! Game Over.");
     this.currentState = WaveState.MatchEnd;
+    
+    // Play Effects (SFX/VFX)
+    if (this.props.coreExpSFXEntity) {
+        this.props.coreExpSFXEntity.as(AudioGizmo)?.play();
+    }
+    if (this.props.coreExpVFXEntity) {
+        this.props.coreExpVFXEntity.as(ParticleGizmo)?.play();
+    }
+
+    // Kill all slimes
+    this.slimeSpawnController?.killAllSlimes();
+
+    // Show Death Page to All Players in Team
+    const players = PlayerManager.instance.getTeamPlayers(this.myTeam);
+    players.forEach(p => {
+        this.sendNetworkEvent(p, Events.deathPageView, { enabled: true });
+        this.sendNetworkEvent(p, Events.matchPageView, { enabled: false }); // Hide HUD
+    });
+
+    // Reset Game after delay? or Wait for user input in DeathPage
+    // For now, let's just show the death page.
   }
 
   private ResetGame() {

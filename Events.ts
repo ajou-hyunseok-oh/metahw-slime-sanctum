@@ -106,6 +106,7 @@ export const Events = {
   waveTimeUpdate: new NetworkEvent<{ remainingSeconds: number }>('waveTimeUpdate'),
   waveClear: new NetworkEvent<{ wave: number }>('waveClear'),
   coreUnderAttack: new NetworkEvent<{ currentHp: number, maxHp: number }>('coreUnderAttack'),
+  coreHit: new NetworkEvent<{ damage: number }>('coreHit'),
   coreDestroyed: new NetworkEvent<{}>('coreDestroyed'),
 
   playerAudioRequest: new NetworkEvent<{ player: Player, soundId: string }>('playerAudioRequest'),

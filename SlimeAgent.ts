@@ -65,6 +65,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
   private attackTimer: number = 0; // 공격 주기 타이머
   private readonly attackInterval: number = 1.5; // 공격 주기 (초)
+  private readonly coreAttackInterval: number = 1.0; // 코어 공격 주기 (1.5배 가속: 1.5 / 1.5 = 1.0)
   private readonly attackDamagePoint: number = 0.7; // 공격 애니메이션 중 데미지가 들어가는 시점 (초)
   
   private idleScaleActive: boolean = false;
@@ -294,6 +295,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
       case SlimeState.AttackCore:
         this.navAgent?.isImmobile.set(true);
+        this.attackTimer = this.coreAttackInterval - this.attackDamagePoint;
         break;
     }
   }
@@ -320,6 +322,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
         this.updateMoveCoreState(deltaTime);
         break;
       case SlimeState.AttackCore:
+        this.updateAttackCoreState(deltaTime);
         break;
     }
   }
@@ -432,12 +435,51 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.nextTarget = this.core.position.get();
     
     const distSq = this.entity.position.get().distanceSquared(this.nextTarget);
-    const attackDist = this.props.attackDistance;
+    const attackDist = this.props.attackDistance * 2; // 코어 공격 시 사정거리 2배
 
     if (distSq <= attackDist * attackDist) {
       this.changeState(SlimeState.AttackCore);
     } else {
       this.updateNavigationMovement();
+    }
+  }
+
+  private updateAttackCoreState(deltaTime: number) {
+    if (!this.core) {
+        this.changeState(SlimeState.Idle);
+        return;
+    }
+
+    const distSq = this.entity.position.get().distanceSquared(this.core.position.get());
+    const attackDist = this.props.attackDistance * 2; // 코어 공격 시 사정거리 2배
+    
+    if (distSq > Math.pow(attackDist * 1.2, 2)) {
+        this.changeState(SlimeState.MoveCore);
+    } else {
+        this.lookAtTarget(this.core.position.get());
+        
+        // 공격 타이머 진행
+        this.attackTimer += deltaTime;
+        
+        // 공격 주기마다 데미지 입힘 (0.7초 시점에 공격)
+        if (this.attackTimer >= this.coreAttackInterval) {
+            this.attackTimer = 0; // 타이머 초기화
+            this.performCoreAttack();
+        }
+    }
+  }
+
+  private performCoreAttack() {
+    if (!this.config || !this.core) return;
+    
+    const minDmg = this.config.minAttackDamage ?? 1;
+    const maxDmg = this.config.maxAttackDamage ?? 1;
+    const damage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+
+    this.sendNetworkBroadcastEvent(Events.coreHit, { damage: damage });
+    
+    if (this.props.attackSFX) {
+        this.props.attackSFX.as(AudioGizmo)?.play();
     }
   }
 
