@@ -128,6 +128,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
         this.sendNetworkEvent(player, Events.matchPageView, {enabled: false});
         this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Lobby' });
         this.matchStateManager?.exitMatch(player);
+        this.weaponSelector?.despawnCurrentWeapon(player.id);
         break;
       case PlayerMode.Match:
         const team = this.getPlayerTeam(player);        

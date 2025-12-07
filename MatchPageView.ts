@@ -79,7 +79,8 @@ class MatchPageView extends Component<typeof MatchPageView> {
         },
         exit: () => {          
           console.log("[MatchPageView] Fire Event: Exit");
-          this.sendNetworkEvent(this.world.getServerPlayer(), Events.requestMatchExit, { playerId: this.world.getLocalPlayer().id });
+          this.setVisibility(false);
+          this.sendNetworkEvent(this.world.getLocalPlayer(), Events.deathPageView, { enabled: true });
         }
       }
     };

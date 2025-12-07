@@ -184,7 +184,7 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
     return { position, rotation };
   }
 
-  private async despawnCurrentWeapon(playerId: number) {
+  public async despawnCurrentWeapon(playerId: number) {
     const state = this.playerStates.get(playerId);
     if (!state) {
       return;

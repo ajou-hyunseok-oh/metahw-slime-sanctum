@@ -1,7 +1,6 @@
 import { CodeBlockEvents, Component, NetworkEvent, Player} from 'horizon/core'; 
 import { NoesisGizmo } from 'horizon/noesis';
-
-const DeathPageViewEvent = new NetworkEvent<{enabled: boolean}>("DeathPageViewEvent");
+import { Events } from 'Events';
 
 class DeathPageView extends Component<typeof DeathPageView> {
 
@@ -16,7 +15,7 @@ class DeathPageView extends Component<typeof DeathPageView> {
   private startServer() {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
       console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
-      this.sendNetworkEvent(player, DeathPageViewEvent, {enabled: false});
+      this.sendNetworkEvent(player, Events.deathPageView, {enabled: false});
     });
   }
 
@@ -26,14 +25,18 @@ class DeathPageView extends Component<typeof DeathPageView> {
     const dataContext = {
       events: {
         goResult: () => {
-          console.log("Go Result");          
+          console.log("`[DeathPageView] Go Result");          
+          this.setVisibility(false);
+          this.sendNetworkEvent(this.world.getLocalPlayer(), Events.resultPageView, { enabled: true });
         }
       }
     };
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
 
-    this.connectNetworkEvent(this.world.getLocalPlayer(), DeathPageViewEvent, data => {
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.deathPageView, data => {
+
+      console.log(`[DeathPageView] received event: ${this.world.getLocalPlayer().name.get()} / enabled: ${data.enabled}`);
       this.setVisibility(data.enabled);
     });
   }

@@ -2,6 +2,8 @@ import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { CodeBlockEvents, Component, Entity, Player, PropTypes, Vec3, Quaternion, SpawnPointGizmo, TextGizmo, NetworkEvent } from 'horizon/core';
 import { SublevelController } from 'SublevelController';
 import { PlayerManager, PlayerMode } from 'PlayerManager';
+import { Events } from 'Events';
+import { MatchStateManager } from 'MatchStateManager';
 
 // 네트워크 이벤트 데이터 구조 정의
 type PartyStateData = {
@@ -50,6 +52,9 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     if (isServer) {
       // 서버: 초기 상태 전송
       this.broadcastState();
+      
+      // 로비 복귀 요청 처리
+      this.connectNetworkBroadcastEvent(Events.returnToLobby, this.onPlayerReturnToLobby.bind(this));
     } else {
       // 클라이언트: 상태 수신 대기
       this.connectNetworkEvent(this.world.getLocalPlayer(), PartyStateEvent, (data) => {
@@ -201,19 +206,39 @@ class PartyMaker extends Behaviour<typeof PartyMaker> {
     }
   }
 
-  private finishMatch() {
-    this.isMatchStarted = false;
-    // 매치 종료 시 상태 업데이트 필요 (선택 사항)
-    // this.broadcastState(); 
-    this.playersInTeam.forEach((player) => {
-      // 로비로 이동
-      const spawnGizmo = this.props.lobbySpawnPoint!.as(SpawnPointGizmo);
-      if (spawnGizmo) {
-        spawnGizmo.teleportPlayer(player);
-      }
+  private onPlayerReturnToLobby(data: { player: Player }) {
+    const player = data.player;
+    console.log(`[PartyMaker] Player ${player.name.get()} returning to lobby.`);
 
-      PlayerManager.instance.setPlayerMode(player, PlayerMode.Lobby);
-    });
+    // 1. 파티 목록에서 제거
+    const index = this.playersInTeam.findIndex(p => p.id === player.id);
+    if (index !== -1) {
+      this.playersInTeam.splice(index, 1);
+      this.broadcastState();
+    }
+
+    // 2. 플레이어 상태 정리 (MatchState)
+    if (MatchStateManager.instance) {
+      MatchStateManager.instance.exitMatch(player);
+    }
+
+    // 3. 로비로 이동 및 모드 변경
+    const spawnGizmo = this.props.lobbySpawnPoint!.as(SpawnPointGizmo);
+    if (spawnGizmo) {
+      spawnGizmo.teleportPlayer(player);
+    }
+    PlayerManager.instance.setPlayerMode(player, PlayerMode.Lobby);
+
+    // 4. BGM 및 UI 처리는 ResultPageView와 PlayerManager 상태 변경에 따라 클라이언트에서 처리됨
+    // 명시적으로 로비 BGM 요청
+    this.sendNetworkEvent(player, Events.playerAudioRequest, { player, soundId: 'Lobby' });
+
+    // 5. 파티원이 모두 나갔으면 매치 상태 완전 초기화
+    if (this.playersInTeam.length === 0) {
+      console.log(`[PartyMaker] All players left. Resetting party state.`);
+      this.isMatchStarted = false;
+      this.stopTimer(); // 타이머 및 상태 초기화
+    }
   }
   
   private loadSublevel() {

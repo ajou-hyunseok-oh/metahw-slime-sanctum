@@ -36,6 +36,7 @@ export const Events = {
   // 결과 화면
   requestShowResults: new NetworkEvent<{ playerId: number }>('requestShowResults'),
   playerShowResults: new NetworkEvent<{ player: Player, score: number, placement?: number }>('playerShowResults'),
+  returnToLobby: new NetworkEvent<{ player: Player }>('returnToLobby'),
 
   // =================================================================================
   // Player State & Management
@@ -92,7 +93,10 @@ export const Events = {
   // =================================================================================
   matchPageView: new NetworkEvent<{ enabled: boolean }>('MatchPageViewEvent'),
   lobbyPageView: new NetworkEvent<{ enabled: boolean }>('LobbyPageViewEvent'),
-  
+  deathPageView: new NetworkEvent<{ enabled: boolean }>('DeathPageViewEvent'),
+  resultPageView: new NetworkEvent<{ enabled: boolean }>('ResultPageViewEvent'),
+  levelUpPageView: new NetworkEvent<{ enabled: boolean }>('LevelUpPageViewEvent'),
+
   loadingProgressUpdate: new NetworkEvent<{ progress: number }>('loadingProgressUpdate'),
   
   playerAudioRequest: new NetworkEvent<{ player: Player, soundId: string }>('playerAudioRequest'),

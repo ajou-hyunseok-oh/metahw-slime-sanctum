@@ -1,7 +1,6 @@
 import {CodeBlockEvents, Component, NetworkEvent, Player} from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-
-const ResultPageViewEvent = new NetworkEvent<{enabled: boolean}>("ResultPageViewEvent");
+import { Events } from 'Events';
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
@@ -22,16 +21,31 @@ class ResultPageView extends Component<typeof ResultPageView> {
     // but server can send events to the clients so that they would update their dataContexts accordingly
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
       console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
-      this.sendNetworkEvent(player, ResultPageViewEvent, {enabled: false});
+      this.sendNetworkEvent(player, Events.resultPageView, {enabled: false});
     });
   }
 
   private startClient() {
-    const dataContext = {      
+    const dataContext = {
+      WaveMessage: `Wave ${99}`,
+      WaveCount: 99,
+      KilledSlimes: `Kills: ${999}`,
+      Coins: 9999,
+      Gems: 9999,
+      events: {
+        goLobby: () => {
+          console.log("[ResultPageView] Go Lobby");                    
+          this.setVisibility(false);
+          this.sendNetworkEvent(this.world.getLocalPlayer(), Events.lobbyPageView, { enabled: true });
+          
+          // 서버로 로비 복귀 요청 전송 (서버 전송 오류 회피를 위해 Broadcast 사용)
+          this.sendNetworkBroadcastEvent(Events.returnToLobby, { player: this.world.getLocalPlayer() });
+        }
+      }      
     };
     this.entity.as(NoesisGizmo).dataContext = dataContext;
 
-    this.connectNetworkEvent(this.world.getLocalPlayer(), ResultPageViewEvent, data => {
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.resultPageView, data => {
       this.setVisibility(data.enabled);
     });
   }
