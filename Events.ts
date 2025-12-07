@@ -70,7 +70,7 @@ export const Events = {
   weaponEquipped: new NetworkEvent<{ player: Player, weaponKey: string, weaponType: string, isRightHand: boolean }>('weaponEquipped'),
   
   // Melee Attack
-  meleeHit: new NetworkEvent<{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number }>('meleeHit'),
+  meleeHit: new NetworkEvent<{ hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number, weaponType?: string }>('meleeHit'),
   
   // Ranged Attack (Gun)
   playerScoredHit: new NetworkEvent<{ player: Player, entity: Entity }>('playerScoredHit'),

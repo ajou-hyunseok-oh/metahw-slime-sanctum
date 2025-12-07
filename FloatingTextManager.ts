@@ -36,7 +36,7 @@ export class FloatingTextManager extends Behaviour<typeof FloatingTextManager> {
       spawns.forEach((spawn : Entity) => {
         var floatingText = BehaviourFinder.GetBehaviour<FloatingText>(spawn);
         floatingText?.setText(text, this.props.floatSpeed, this.props.rotationSpeed, this.props.duration);
-        position.y = this.props.yPos;
+        position.y += this.props.yPos;
         spawn.position.set(position);
         spawn.color.set(color);
       })

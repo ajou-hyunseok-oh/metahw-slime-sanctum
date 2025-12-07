@@ -3,7 +3,7 @@ import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
 import { Color, Component, Player, PropTypes, Quaternion, Vec3, Entity, AudioGizmo, ParticleGizmo } from "horizon/core";
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
-import { SLIME_BASE_STATS, SlimeStats } from "GameBalanceData";
+import { SLIME_BASE_STATS, SlimeStats, WeaponType } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
@@ -601,13 +601,22 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     return new Vec3(x, y, z);
   }
 
-  private onMeleeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number }) {
+  private onMeleeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number, weaponType?: string }) {
     if (this.isDead) return;
 
     const clampedDamage = Math.max(0, Math.floor(data.damage));
     if (clampedDamage <= 0) return;
 
-    this.npcHit(data.hitPos, data.hitNormal, clampedDamage);
+    let hitColor = Color.red;
+    if (data.weaponType) {
+        switch (data.weaponType) {
+            case WeaponType.Magic: hitColor = new Color(0, 0.5, 1); break; // Light Blue
+            case WeaponType.Ranged: hitColor = new Color(1, 1, 0); break; // Yellow
+            // case WeaponType.Melee: hitColor = Color.red; break; // Default red
+        }
+    }
+
+    this.npcHit(data.hitPos, data.hitNormal, clampedDamage, hitColor);
     this.sendNetworkBroadcastEvent(Events.playerScoredHit, { player: data.fromPlayer, entity: this.entity });
     
     const remainingHp = this.applyDamage(clampedDamage);
@@ -624,10 +633,15 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     }
   }
 
-  protected npcHit(hitPos: Vec3, hitNormal: Vec3, damage: number) {
+  protected npcHit(hitPos: Vec3, hitNormal: Vec3, damage: number, color: Color = Color.red) {
     if (this.isDead) return;
 
-    FloatingTextManager.instance?.createFloatingText(damage.toString(), hitPos, Color.red);
+    const randomOffset = new Vec3(
+        (Math.random() - 0.5) * 0.5, 
+        (Math.random() - 0.5) * 0.5, 
+        (Math.random() - 0.5) * 0.5
+    );
+    FloatingTextManager.instance?.createFloatingText(damage.toString(), hitPos.add(randomOffset), color);
 
     if (this.props.hitSFX) {      
       this.props.hitSFX.as(AudioGizmo)?.play();

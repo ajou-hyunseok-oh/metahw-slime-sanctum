@@ -229,13 +229,13 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       
       // 플레이어의 근접 공격 레벨을 1로 설정 (무기 지급 조건 충족)
       //MatchStateManager.instance.setCombatAttributes(player, { meleeAttackLevel: 1 });
-      //MatchStateManager.instance.setCombatAttributes(player, { rangedAttackLevel: 1 });
-      MatchStateManager.instance.setCombatAttributes(player, { magicAttackLevel: 1 });
+      MatchStateManager.instance.setCombatAttributes(player, { rangedAttackLevel: 1 });
+      //MatchStateManager.instance.setCombatAttributes(player, { magicAttackLevel: 1 });
       this.sendNetworkEvent(player, Events.matchPageView, { enabled: true });
 
       // 1레벨 무기 지급
       if (WeaponSelector.Instance) {
-        WeaponSelector.Instance.grabWeapon(WeaponType.Magic, 1, player);
+        WeaponSelector.Instance.grabWeapon(WeaponType.Ranged, 1, player);
       } else {
         console.warn('[SublevelController] WeaponSelector instance not found.');
       }

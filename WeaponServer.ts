@@ -82,7 +82,7 @@ export class WeaponServer extends Behaviour<typeof WeaponServer> {
 
     let hitCount = 0;
     for (const target of targets) {
-      this.emitHitEvent(target.agent, player, target.position, target.delta, damage);
+      this.emitHitEvent(target.agent, player, target.position, target.delta, damage, WeaponType.Melee);
       hitCount++;
     }
     console.log(`[WeaponServer] Melee hit ${hitCount} targets. Damage: ${damage}`);
@@ -106,11 +106,11 @@ export class WeaponServer extends Behaviour<typeof WeaponServer> {
     }
 
     // Direct Hit
-    this.emitHitEvent(closestTarget.agent, player, closestTarget.position, closestTarget.delta, damage);
+    this.emitHitEvent(closestTarget.agent, player, closestTarget.position, closestTarget.delta, damage, WeaponType.Ranged);
 
     // Splash Logic (if applicable)
     if (splashRadius > 0 && splashDamage > 0) {
-      this.damageEnemiesWithinRadius(closestTarget.position, splashRadius, player, splashDamage, [closestTarget.agent.entity.id]);
+      this.damageEnemiesWithinRadius(closestTarget.position, splashRadius, player, splashDamage, WeaponType.Ranged, [closestTarget.agent.entity.id]);
     }
   }
 
@@ -134,7 +134,7 @@ export class WeaponServer extends Behaviour<typeof WeaponServer> {
     }
 
     // AOE Damage
-    const damagedCount = this.damageEnemiesWithinRadius(closestTarget.position, radius, player, damage);
+    const damagedCount = this.damageEnemiesWithinRadius(closestTarget.position, radius, player, damage, WeaponType.Magic);
     
     // AOE Heal
     const healedCount = this.healPlayersWithinRadius(closestTarget.position, radius, healAmount);
@@ -142,17 +142,18 @@ export class WeaponServer extends Behaviour<typeof WeaponServer> {
     // console.log(`[WeaponServer] Magic hit ${damagedCount} enemies, healed ${healedCount} players.`);
   }
 
-  private emitHitEvent(agent: AnySlimeAgent, player: hz.Player, targetPosition: hz.Vec3, delta: hz.Vec3, damage: number) {
+  private emitHitEvent(agent: AnySlimeAgent, player: hz.Player, targetPosition: hz.Vec3, delta: hz.Vec3, damage: number, weaponType?: string) {
     const hitNormal = this.buildHitNormal(delta.x, delta.y, delta.z);
     this.sendNetworkEvent(agent.entity, Events.meleeHit, {
       hitPos: targetPosition,
       hitNormal,
       fromPlayer: player,
       damage,
+      weaponType
     });
   }
 
-  private damageEnemiesWithinRadius(center: hz.Vec3, radius: number, player: hz.Player, damage: number, ignoreEntityIds: bigint[] = []): number {
+  private damageEnemiesWithinRadius(center: hz.Vec3, radius: number, player: hz.Player, damage: number, weaponType: string, ignoreEntityIds: bigint[] = []): number {
     if (damage <= 0) return 0;
 
     const radiusSq = radius * radius;
@@ -170,7 +171,7 @@ export class WeaponServer extends Behaviour<typeof WeaponServer> {
       
       if (distSq <= radiusSq) {
         const delta = pos.sub(center);
-        this.emitHitEvent(agent, player, pos, delta, damage);
+        this.emitHitEvent(agent, player, pos, delta, damage, weaponType);
         hitCount++;
       }
     }
