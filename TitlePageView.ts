@@ -3,110 +3,57 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on December 04, 2025
+// Modified by Hyunseok Oh on December 07, 2025
 
-import { CodeBlockEvents, Component, Player } from 'horizon/core';
+import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
+import { NoesisGizmo } from 'horizon/noesis';
+import { PlayerStartEvent } from 'PlayerManager';
+
+const TitlePageViewEvent = new NetworkEvent<{enabled: boolean}>("TitlePageViewEvent");
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
  * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
  */
 class TitlePageView extends Component<typeof TitlePageView> {
-  private hasDismissedLocalUi = false;
-  private minDisplayComplete = false;
-  private playerReady = false;
-  private playerReadyPollId: number | null = null;
-
   start() {
-    const localPlayer = this.world.getLocalPlayer();
-    const serverPlayer = this.world.getServerPlayer();
-
-    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
-      console.log('[TitlePageView] Server context detected; skipping client UI logic.');
-      return;
+    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
+      this.startServer();
+    } else {
+      this.startClient();
     }
-
-    this.registerEntryLogging();
-    this.initializeDisplayFlow();
   }
 
-  private registerEntryLogging() {
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      try {
-        console.log('[TitlePageView] Player entered world:', player.name.get());
-      } catch {
-        console.log('[TitlePageView] Player entered world:', player.id);
+  private startServer() {
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
+      this.sendNetworkEvent(player, TitlePageViewEvent, {enabled: true});
+    });
+  }
+
+  private startClient() {
+    const dataContext = {};
+    this.entity.as(NoesisGizmo).dataContext = dataContext;
+
+    this.connectNetworkEvent(this.world.getLocalPlayer(), TitlePageViewEvent, data => {
+      console.log(`[TitlePageView] TitlePageViewEvent received for ${this.world.getLocalPlayer().name.get()}: ${data.enabled}`);
+
+      if (data.enabled) {
+        this.async.setTimeout(() => {
+          console.log(`[TitlePageView] PlayerStartEvent Send}`);
+          this.sendNetworkBroadcastEvent(PlayerStartEvent, {player: this.world.getLocalPlayer()});
+          this.setVisibility(false);
+        }, 3000);    
+      }
+      else {
+        this.setVisibility(false);
       }
     });
   }
 
-  private initializeDisplayFlow() {
-    this.async.setTimeout(() => {
-      this.minDisplayComplete = true;
-      this.tryDismiss();
-    }, 3000);
+  private setVisibility(enabled: boolean) {
+    this.entity.visible.set(enabled);
+  }  
 
-    this.startPollingForPlayerReady();
-  }
-
-  private startPollingForPlayerReady() {
-    if (this.playerReadyPollId !== null) {
-      return;
-    }
-
-    this.playerReadyPollId = this.async.setInterval(() => {
-      if (this.checkPlayerLoaded()) {
-        this.playerReady = true;
-        this.stopPlayerReadyPoll();
-        this.tryDismiss();
-      }
-    }, 250);
-  }
-
-  private stopPlayerReadyPoll() {
-    if (this.playerReadyPollId === null) {
-      return;
-    }
-
-    this.async.clearInterval(this.playerReadyPollId);
-    this.playerReadyPollId = null;
-  }
-
-  private checkPlayerLoaded(): boolean {
-    try {
-      const localPlayer = this.world.getLocalPlayer();
-      if (!localPlayer) {
-        return false;
-      }
-      return localPlayer.isValidReference.get();
-    } catch {
-      return false;
-    }
-  }
-
-  private tryDismiss() {
-    if (this.hasDismissedLocalUi) {
-      return;
-    }
-
-    if (!this.minDisplayComplete || !this.playerReady) {
-      return;
-    }
-
-    this.dismissLocalUi();
-  }
-
-  private dismissLocalUi() {
-    if (this.hasDismissedLocalUi) {
-      return;
-    }
-
-    this.hasDismissedLocalUi = true;
-    this.stopPlayerReadyPoll();
-    this.entity.visible.set(false);
-    this.entity.collidable.set(false);
-    this.entity.simulated.set(false);
-  }
 }
 
 Component.register(TitlePageView);

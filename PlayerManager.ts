@@ -12,17 +12,28 @@ import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'hor
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 import { PlayerPersistentVariables, PersistentVariables } from 'PlayerPersistentVariables';
 import { MatchStateManager } from 'MatchStateManager';
-import { TeamType } from 'GameConstants';
+import { MatchPageViewEvent } from 'MatchPageView';
+import { LobbyPageViewEvent } from 'LobbyPageView';
 
 export enum PlayerMode {
+  None = "None",
   Lobby = "Lobby",
   Match = "Match",
 }
 
-type ManagedPlayerState = {
+export enum TeamType {
+  None = "None",
+  East = "East",
+  West = "West",
+}
+
+type PlayerState = {
   mode: PlayerMode;
   team: TeamType;
 };
+
+
+export const PlayerStartEvent = new NetworkEvent<{player: Player}>("PlayerStartEvent");
 
 const playerModeChangedEvent = (Events as unknown as {
   playerModeChanged: NetworkEvent<{ mode: string }>;
@@ -40,6 +51,10 @@ const playerPersistentStatsUpdateEvent = (Events as unknown as {
   playerPersistentStatsUpdate: NetworkEvent<PersistentVariables>;
 }).playerPersistentStatsUpdate;
 
+const playerShowResultsEvent = (Events as unknown as {
+  playerShowResults: NetworkEvent<{player: Player, score: number, placement?: number}>;
+}).playerShowResults;
+
 export class PlayerManager extends Behaviour<typeof PlayerManager> {
   static propsDefinition = {
     matchSpawnPoint: { type: PropTypes.Entity },
@@ -56,7 +71,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   static instance: PlayerManager;
   private weaponSelector: WeaponSelector | undefined;
 
-  private readonly playerStates = new Map<number, ManagedPlayerState>();
+  private readonly playerStateMap = new Map<number, PlayerState>();
   private playerPersistentVariables: PlayerPersistentVariables | undefined;
   private playerPersistentCache = new Map<number, PersistentVariables>();
   private matchStateManager: MatchStateManager | undefined;
@@ -65,25 +80,65 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     PlayerManager.instance = this;
   }
 
-  Start() {
-    this.weaponSelector = WeaponSelector.Instance ?? undefined;
+  Start() {    
     this.playerPersistentVariables = new PlayerPersistentVariables(this.world);
-    this.matchStateManager = MatchStateManager.instance;
-    if (!this.matchStateManager) {
-      console.warn('[PlayerManager] MatchStateManager 인스턴스를 찾을 수 없습니다. 매치 상태 추적이 비활성화됩니다.');
-    }
-    this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));
+    this.matchStateManager = MatchStateManager.instance!;
+    this.weaponSelector = WeaponSelector.Instance ?? undefined;
+
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, this.onPlayerEnterWorld.bind(this));
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerExitWorld, this.onPlayerExitWorld.bind(this));
-    this.connectNetworkBroadcastEvent(
-      playerPersistentStatsRequestEvent,
-      this.onPlayerPersistentStatsRequest.bind(this)
-    );
+
+    this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));    
+    this.connectNetworkBroadcastEvent(playerPersistentStatsRequestEvent, this.onPlayerPersistentStatsRequest.bind(this));
+    this.connectNetworkEvent(this.world.getLocalPlayer(), playerShowResultsEvent, this.onPlayerShowResults.bind(this));
+
+    this.connectNetworkBroadcastEvent(PlayerStartEvent, (data: {player: Player}) => {
+      const player = data.player;
+      console.log(`[PlayerManager] PlayerStartEvent received for ${player.name.get()}`);
+      this.setPlayerMode(player, PlayerMode.Lobby);
+    });
+  }
+
+  private onPlayerEnterWorld(player: Player) {    
+    this.createPlayerState(player);
+
+    if (this.playerPersistentVariables) {
+      const variables = this.playerPersistentVariables.load(player);
+      this.playerPersistentCache.set(player.id, variables);      
+      this.sendPersistentStats(player, variables);
+    }
+  }
+
+  private onPlayerExitWorld(player: Player) {
+    const cached = this.playerPersistentCache.get(player.id);
+    if (cached && this.playerPersistentVariables) {
+      this.playerPersistentVariables.save(player, cached);      
+      this.playerPersistentCache.delete(player.id);
+    }
+    this.matchStateManager?.exitMatch(player);
+  }
+
+  private createPlayerState(player: Player) {    
+    const newState: PlayerState = { mode: PlayerMode.None, team: TeamType.None };
+    this.playerStateMap.set(player.id, newState);    
+  }
+
+  private getPlayerState(player: Player): PlayerState {
+    let state = this.playerStateMap.get(player.id);
+    if (!state) {
+      state = { mode: PlayerMode.Lobby, team: TeamType.None };
+      this.playerStateMap.set(player.id, state);
+    }
+    return state;
+  }
+
+  public getPlayerMode(player: Player): PlayerMode {
+    return this.getPlayerState(player).mode;
   }
 
   public setPlayerMode(player: Player, mode: PlayerMode) {
-    const state = this.getOrCreatePlayerState(player);
-    if (state.mode === mode) {
+    const state = this.getPlayerState(player);    
+    if (mode === state.mode) {
       return;
     }
 
@@ -91,39 +146,29 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     this.onPlayerModeChanged(player, mode);
   }
 
+  public getPlayerTeam(player: Player): TeamType {
+    return this.getPlayerState(player).team;
+  }
+
   public setPlayerTeam(player: Player, team: TeamType) {
-    const state = this.getOrCreatePlayerState(player);
+    const state = this.getPlayerState(player);
     state.team = team;
-  }
+  }  
 
-  private getOrCreatePlayerState(player: Player): ManagedPlayerState {
-    let state = this.playerStates.get(player.id);
-    if (!state) {
-      state = { mode: PlayerMode.Lobby, team: TeamType.None };
-      this.playerStates.set(player.id, state);
-    }
-    return state;
-  }
-
-  private onPlayerModeChanged(player: Player, mode: PlayerMode) {
-    this.notifyPlayerMode(player, mode);
-
-    const state = this.getOrCreatePlayerState(player);
-
+  private onPlayerModeChanged(player: Player, mode: PlayerMode) {    
     switch (mode) {
-      case PlayerMode.Lobby:
-        console.log(`[PlayerManager] ${player.name.get()} -> Lobby`);
+      case PlayerMode.Lobby:        
+        this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: true});
+        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});        
         this.matchStateManager?.exitMatch(player);
         break;
       case PlayerMode.Match:
-        console.log(`[PlayerManager] ${player.name.get()} -> Match (Team: ${state.team})`);
-        this.matchStateManager?.enterMatch(player, { team: state.team });        
+        const team = this.getPlayerTeam(player);        
+        this.matchStateManager?.enterMatch(player, { team: team });        
+        this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
+        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: true});        
         break;
     }
-  }
-
-  public getPlayerMode(player: Player): PlayerMode {
-    return this.getOrCreatePlayerState(player).mode;
   }
 
   private onPlayerModeRequest(data: { playerId: number }) {
@@ -132,10 +177,10 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
       return;
     }
 
-    const mode = this.getPlayerMode(player);
-    this.notifyPlayerMode(player, mode);
+    const mode = this.getPlayerMode(player);    
   }
 
+  /*
   private notifyPlayerMode(player: Player, mode: PlayerMode) {
     // Debug Log
     console.log(`[PlayerManager] notifyPlayerMode called for ${player.name.get()}. Mode: ${mode}`);
@@ -148,30 +193,11 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     console.log(`[PlayerManager] Broadcasting playClientAudio event for ${player.name.get()}. SoundId: ${soundId}`);
     this.sendNetworkBroadcastEvent(Events.playClientAudio, { playerId: player.id, soundId });
   }
+  */
 
   public getPersistentStats(player: Player): PersistentVariables | null {
     return this.playerPersistentCache.get(player.id) ?? null;
-  }
-
-  private onPlayerEnterWorld(player: Player) {
-    this.setPlayerMode(player, PlayerMode.Lobby);
-    if (this.playerPersistentVariables) {
-      const variables = this.playerPersistentVariables.load(player);
-      this.playerPersistentCache.set(player.id, variables);
-      //console.log(`[PlayerManager] Loaded persistent stats for ${player.name.get()}`);
-      this.sendPersistentStats(player, variables);
-    }
-  }
-
-  private onPlayerExitWorld(player: Player) {
-    const cached = this.playerPersistentCache.get(player.id);
-    if (cached && this.playerPersistentVariables) {
-      this.playerPersistentVariables.save(player, cached);
-      console.log(`[PlayerManager] Saved persistent stats for ${player.name.get()}`);
-      this.playerPersistentCache.delete(player.id);
-    }
-    this.matchStateManager?.exitMatch(player);
-  }
+  }  
 
   private onPlayerPersistentStatsRequest(data: { playerId: number }) {
     const player = this.world.getPlayers().find((p) => p.id === data.playerId);
@@ -179,6 +205,10 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
       return;
     }
     this.sendPersistentStats(player);
+  }
+
+  private onPlayerShowResults(data: {player: Player, score: number, placement?: number}) {
+    console.log(`[PlayerManager] Game Over! Score: ${data.score}, Waves: ${data.placement ?? 0}`);
   }
 
   private sendPersistentStats(player: Player, stats?: PersistentVariables) {

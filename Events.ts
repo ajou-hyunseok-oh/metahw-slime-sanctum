@@ -67,4 +67,9 @@ export const Events = {
 
   // Audio
   playClientAudio: new NetworkEvent<{ playerId: number, soundId: string }>('playClientAudio'),
+
+  // Game Flow
+  requestMatchExit: new NetworkEvent<{ playerId: number }>('requestMatchExit'),
+  playerDied: new NetworkEvent<{ playerId: number }>('playerDied'), // 클라이언트에게 사망 알림 (DeathPageView 활성화용)
+  requestShowResults: new NetworkEvent<{ playerId: number }>('requestShowResults'), // DeathPageView에서 결과 보기 요청
 };

@@ -3,14 +3,17 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 //
-// Modified by Hyunseok Oh on December 04, 2025 
+// Modified by Hyunseok Oh on December 07, 2025 
 
-import { Component, NetworkEvent, Player } from 'horizon/core';
+import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
 import { Events } from 'Events';
 import { PlayerMode } from 'PlayerManager';
 import { PersistentVariables } from 'PlayerPersistentVariables';
 
+export const LobbyPageViewEvent = new NetworkEvent<{enabled: boolean}>("LobbyPageViewEvent");
+
+/*
 const playerModeChangedEvent = (Events as unknown as {
   playerModeChanged: NetworkEvent<{ mode: string }>;
 }).playerModeChanged;
@@ -22,13 +25,61 @@ const playerPersistentStatsRequestEvent = (Events as unknown as {
 const playerPersistentStatsUpdateEvent = (Events as unknown as {
   playerPersistentStatsUpdate: NetworkEvent<PersistentVariables>;
 }).playerPersistentStatsUpdate;
+*/
 
-/**
- * This is an example of a NoesisUI component that can be used in a world.
- * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
- */
 class LobbyPageView extends Component<typeof LobbyPageView> {
   start() {
+    if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
+      this.startServer();
+    } else {
+      this.startClient();
+    }
+  }  
+  
+  private startServer() {
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
+      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
+      this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
+    });
+  }
+
+  private startClient() {
+    const dataContext = {
+      BestWaves: 0,
+      Coins: 0,
+      Gems: 0,
+    };
+
+    this.entity.as(NoesisGizmo).dataContext = dataContext;
+
+    this.connectNetworkEvent(this.world.getLocalPlayer(), LobbyPageViewEvent, data => {
+      console.log(`[LobbyPageView] LobbyPageViewEvent received for ${this.world.getLocalPlayer().name.get()}: ${data.enabled}`);
+      this.setVisibility(data.enabled);
+    });
+
+    /*
+    this.connectNetworkEvent(this.world.getLocalPlayer(), playerModeChangedEvent, payload => {
+      const isLobby = payload.mode === PlayerMode.Lobby;
+      this.setVisibility(true);
+    });
+
+    this.connectNetworkEvent(this.world.getLocalPlayer(), playerPersistentStatsUpdateEvent, stats => {
+      if (!this.entity.visible.get()) return;
+
+      dataContext.BestWaves = stats.bestWaves;
+      dataContext.Coins = stats.coins;
+      dataContext.Gems = stats.gems;
+    });
+    */
+  }
+
+  private setVisibility(enabled: boolean) {
+    this.entity.visible.set(enabled);
+  }
+
+  /*
+    start() {
+    
     const localPlayer = this.world.getLocalPlayer();
     const serverPlayer = this.world.getServerPlayer();
 
@@ -78,6 +129,7 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
   }
+  */
 }
 
 Component.register(LobbyPageView);

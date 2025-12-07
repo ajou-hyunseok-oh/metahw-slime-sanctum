@@ -46,6 +46,22 @@ const playerHitEvent = (Events as unknown as {
   playerHit: NetworkEvent<{ player: Player, damage: number, damageOrigin: Vec3 }>;
 }).playerHit;
 
+const requestMatchExitEvent = (Events as unknown as {
+  requestMatchExit: NetworkEvent<{ playerId: number }>;
+}).requestMatchExit;
+
+const playerDiedEvent = (Events as unknown as {
+  playerDied: NetworkEvent<{ playerId: number }>;
+}).playerDied;
+
+const requestShowResultsEvent = (Events as unknown as {
+  requestShowResults: NetworkEvent<{ playerId: number }>;
+}).requestShowResults;
+
+const playerShowResultsEvent = (Events as unknown as {
+  playerShowResults: NetworkEvent<{ player: Player, score: number, placement?: number }>;
+}).playerShowResults;
+
 /**
  * 서버에서 플레이어별 매치 진행 상태(HP, 능력치, 진행 기록 등)를 일원화해 관리한다.
  * HP/공격 스탯은 반드시 이 매니저를 경유해 갱신해야 다른 시스템과 정합성이 보장된다.
@@ -70,6 +86,8 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   protected Start() {
     this.connectNetworkBroadcastEvent(matchStateRequestEvent, this.onMatchStateRequested.bind(this));
     this.connectNetworkBroadcastEvent(playerHitEvent, this.onPlayerHit.bind(this));
+    this.connectNetworkBroadcastEvent(requestMatchExitEvent, this.onRequestMatchExit.bind(this));
+    this.connectNetworkBroadcastEvent(requestShowResultsEvent, this.onRequestShowResults.bind(this));
   }
 
   /**
@@ -372,10 +390,45 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     console.log(`[MatchStateManager] Player ${player.name.get()} Hit! Raw: ${rawDamage}, Def: ${state.defense}, Final: ${damage}. HP: ${state.hpCurrent}/${state.hpMax}`);
 
     if (state.hpCurrent <= 0) {
-       // 사망 처리 로직 (필요 시 구현)
-       // 예: Events.playerDeath 발송 등
-       // this.sendNetworkBroadcastEvent(Events.playerDeath, { player });
+       console.log(`[MatchStateManager] Player ${player.name.get()} died.`);
+       this.notifyPlayerDeath(player);
     }
+  }
+
+  private onRequestMatchExit(data: { playerId: number }) {
+    const player = this.world.getPlayers().find((p) => p.id === data.playerId);
+    if (!player) return;
+
+    const state = this.playerStates.get(player.id);
+    if (state) {
+      console.log(`[MatchStateManager] Player ${player.name.get()} requested exit.`);
+      this.notifyPlayerDeath(player);
+    }
+  }
+
+  private onRequestShowResults(data: { playerId: number }) {
+    const player = this.world.getPlayers().find((p) => p.id === data.playerId);
+    if (!player) return;
+
+    const state = this.playerStates.get(player.id);
+    if (state) {
+        this.sendResults(player, state);
+    }
+  }
+
+  private notifyPlayerDeath(player: Player) {
+      this.sendNetworkEvent(player, playerDiedEvent, { playerId: player.id });
+  }
+
+  private sendResults(player: Player, state: MatchVariables) {
+     // 점수 계산 (예: 킬수 * 10 + 웨이브 * 100)
+     const score = (state.slimeKills * 10) + (state.wavesSurvived * 100);
+     
+     this.sendNetworkEvent(player, playerShowResultsEvent, { 
+       player, 
+       score,
+       placement: state.wavesSurvived // 임시로 placement에 웨이브 수 전달
+     });
   }
 
   private clamp(value: number | undefined, min: number, max: number): number {
