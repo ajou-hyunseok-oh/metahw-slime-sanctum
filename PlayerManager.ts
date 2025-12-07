@@ -137,7 +137,16 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   }
 
   private notifyPlayerMode(player: Player, mode: PlayerMode) {
+    // Debug Log
+    console.log(`[PlayerManager] notifyPlayerMode called for ${player.name.get()}. Mode: ${mode}`);
+
     this.sendNetworkEvent(player, playerModeChangedEvent, { mode });
+
+    // Request Audio Playback based on mode
+    const soundId = mode === PlayerMode.Lobby ? 'Lobby' : 'Match';
+    
+    console.log(`[PlayerManager] Broadcasting playClientAudio event for ${player.name.get()}. SoundId: ${soundId}`);
+    this.sendNetworkBroadcastEvent(Events.playClientAudio, { playerId: player.id, soundId });
   }
 
   public getPersistentStats(player: Player): PersistentVariables | null {
@@ -149,7 +158,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     if (this.playerPersistentVariables) {
       const variables = this.playerPersistentVariables.load(player);
       this.playerPersistentCache.set(player.id, variables);
-      console.log(`[PlayerManager] Loaded persistent stats for ${player.name.get()}`);
+      //console.log(`[PlayerManager] Loaded persistent stats for ${player.name.get()}`);
       this.sendPersistentStats(player, variables);
     }
   }

@@ -104,6 +104,9 @@ class MatchPageView extends Component<typeof MatchPageView> {
         swapWeapon: () => {
           console.log("Swap Weapon");
         },
+        exit: () => {
+          console.log("Exit");
+        }
       }
     };
 

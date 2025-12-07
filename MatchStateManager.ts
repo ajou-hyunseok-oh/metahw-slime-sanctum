@@ -98,6 +98,13 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   /**
+   * 게임 종료 시 호출하여 해당 플레이어에게 종료 사운드 등을 재생하도록 요청한다.
+   */
+  public notifyGameEnd(player: Player) {
+    //this.sendNetworkBroadcastEvent(Events.playClientAudio, { playerId: player.id, soundId: 'GameEnd' });
+  }
+
+  /**
    * 현재 상태를 읽기 전용으로 반환한다.
    */
   public getStats(player: Player): MatchVariables | undefined {

@@ -64,14 +64,7 @@ export const Events = {
   
   // Player HUD
   playerHPUpdate: new NetworkEvent<{ current: number, max: number }>('playerHPUpdate'),
-};
 
-export const WaveManagerNetworkEvents = {
-  StartWaveGroup: new NetworkEvent<{waveGroupName : string}>('StartWaveGroup'),
-  StopWaveGroup: new NetworkEvent<{waveGroupName : string}>('StopWaveGroup'),
-  NextWave: new NetworkEvent<{waveGroupName : string}>('NextWave'),
-  StartingWave: new NetworkEvent<{waveGroupName: string, waveNumber : number}>('StartingWave'),
-  WaveComplete: new NetworkEvent<{waveGroupName: string, waveNumber : number}>('WaveComplete'),
-  FightStarted: new NetworkEvent<{waveGroupName: string}>('FightStarted'),
-  FightEnded: new NetworkEvent<{waveGroupName: string}>('FightEnded'),
+  // Audio
+  playClientAudio: new NetworkEvent<{ playerId: number, soundId: string }>('playClientAudio'),
 };
