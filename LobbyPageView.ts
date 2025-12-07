@@ -43,7 +43,7 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
       }
     });
 
-    this.connectNetworkEvent(localPlayer, Events.playerPersistentStatsUpdate, stats => {\      
+    this.connectNetworkEvent(localPlayer, Events.playerPersistentStatsUpdate, stats => {
       dataContext.BestWaves = stats.bestWaves;
       dataContext.Coins = stats.coins;
       dataContext.Gems = stats.gems;      
