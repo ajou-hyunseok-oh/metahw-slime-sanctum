@@ -8,24 +8,8 @@
 import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
 import { Events } from 'Events';
-import { PlayerMode } from 'PlayerManager';
-import { PersistentVariables } from 'PlayerPersistentVariables';
 
 export const LobbyPageViewEvent = new NetworkEvent<{enabled: boolean}>("LobbyPageViewEvent");
-
-/*
-const playerModeChangedEvent = (Events as unknown as {
-  playerModeChanged: NetworkEvent<{ mode: string }>;
-}).playerModeChanged;
-
-const playerPersistentStatsRequestEvent = (Events as unknown as {
-  playerPersistentStatsRequest: NetworkEvent<{ playerId: number }>;
-}).playerPersistentStatsRequest;
-
-const playerPersistentStatsUpdateEvent = (Events as unknown as {
-  playerPersistentStatsUpdate: NetworkEvent<PersistentVariables>;
-}).playerPersistentStatsUpdate;
-*/
 
 class LobbyPageView extends Component<typeof LobbyPageView> {
   start() {
@@ -37,8 +21,7 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
   }  
   
   private startServer() {
-    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
-      console.log('NoesisUI: OnPlayerEnterWorld', player.name.get());
+    this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
       this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
     });
   }
@@ -51,87 +34,25 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
     };
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
+    const localPlayer = this.world.getLocalPlayer();
 
-    this.connectNetworkEvent(this.world.getLocalPlayer(), LobbyPageViewEvent, data => {
-      console.log(`[LobbyPageView] LobbyPageViewEvent received for ${this.world.getLocalPlayer().name.get()}: ${data.enabled}`);
+    this.connectNetworkEvent(localPlayer, LobbyPageViewEvent, data => {      
       this.setVisibility(data.enabled);
+      if (data.enabled) {
+        this.sendNetworkBroadcastEvent(Events.playerPersistentStatsRequest, { playerId: localPlayer.id });
+      }
     });
 
-    /*
-    this.connectNetworkEvent(this.world.getLocalPlayer(), playerModeChangedEvent, payload => {
-      const isLobby = payload.mode === PlayerMode.Lobby;
-      this.setVisibility(true);
-    });
-
-    this.connectNetworkEvent(this.world.getLocalPlayer(), playerPersistentStatsUpdateEvent, stats => {
-      if (!this.entity.visible.get()) return;
-
+    this.connectNetworkEvent(localPlayer, Events.playerPersistentStatsUpdate, stats => {\      
       dataContext.BestWaves = stats.bestWaves;
       dataContext.Coins = stats.coins;
-      dataContext.Gems = stats.gems;
+      dataContext.Gems = stats.gems;      
     });
-    */
   }
 
   private setVisibility(enabled: boolean) {
     this.entity.visible.set(enabled);
   }
-
-  /*
-    start() {
-    
-    const localPlayer = this.world.getLocalPlayer();
-    const serverPlayer = this.world.getServerPlayer();
-
-    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
-      console.log('[LobbyPageView] Server context detected; skipping client UI logic.');
-      return;
-    }
-    
-    console.log('[LobbyPageView] locally started');
-    
-    this.connectNetworkEvent(localPlayer, playerModeChangedEvent, payload => {
-      const isLobby = payload.mode === PlayerMode.Lobby;
-      this.setVisibility(isLobby, localPlayer);
-    });
-
-    this.connectNetworkEvent(localPlayer, playerPersistentStatsUpdateEvent, stats => {
-      this.onStatsUpdated(stats);
-    });
-
-    this.setVisibility(true, localPlayer);
-  }
-
-  private setVisibility(visible: boolean, player: Player) {
-    this.entity.visible.set(visible);
-    if (visible) {
-      this.requestPersistentStats(player);
-    }
-  }
-
-  private requestPersistentStats(player: Player) {
-    this.sendNetworkBroadcastEvent(playerPersistentStatsRequestEvent, { playerId: player.id });
-  }
-
-  private onStatsUpdated(stats: PersistentVariables) {
-    console.log('[LobbyPageView] Persistent stats updated', stats);
-    // TODO: Bind stats to UI data context when ready.
-    console.log('[LobbyPageView] Coins:', stats.coins);
-    console.log('[LobbyPageView] Gems:', stats.gems);
-    console.log('[LobbyPageView] Best Waves:', stats.bestWaves);
-    console.log('[LobbyPageView] Killed Slimes:', stats.killedSlimes);
-
-    const dataContext = {
-      BestWaves: stats.bestWaves,
-      Coins: stats.coins,
-      Gems: stats.gems      
-    };
-
-    this.entity.as(NoesisGizmo).dataContext = dataContext;
-  }
-  */
 }
 
 Component.register(LobbyPageView);
-
-

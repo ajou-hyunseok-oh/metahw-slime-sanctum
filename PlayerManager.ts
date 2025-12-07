@@ -35,42 +35,16 @@ type PlayerState = {
 
 export const PlayerStartEvent = new NetworkEvent<{player: Player}>("PlayerStartEvent");
 
-const playerModeChangedEvent = (Events as unknown as {
-  playerModeChanged: NetworkEvent<{ mode: string }>;
-}).playerModeChanged;
-
-const playerModeRequestEvent = (Events as unknown as {
-  playerModeRequest: NetworkEvent<{ playerId: number }>;
-}).playerModeRequest;
-
-const playerPersistentStatsRequestEvent = (Events as unknown as {
-  playerPersistentStatsRequest: NetworkEvent<{ playerId: number }>;
-}).playerPersistentStatsRequest;
-
-const playerPersistentStatsUpdateEvent = (Events as unknown as {
-  playerPersistentStatsUpdate: NetworkEvent<PersistentVariables>;
-}).playerPersistentStatsUpdate;
-
-const playerShowResultsEvent = (Events as unknown as {
-  playerShowResults: NetworkEvent<{player: Player, score: number, placement?: number}>;
-}).playerShowResults;
-
 export class PlayerManager extends Behaviour<typeof PlayerManager> {
   static propsDefinition = {
     matchSpawnPoint: { type: PropTypes.Entity },
-    lobbySpawnPoint: { type: PropTypes.Entity },
-    playerMaxHp: { type: PropTypes.Number, default: 100 },
-    respawnInvincibibilityMs: { type: PropTypes.Number, default: 3000 },
-    playerStartAmmo: { type: PropTypes.Number, default: 10 },
-    knockbackForceOnHit : { type: PropTypes.Number, default: 0 },
-    hitScream : { type: PropTypes.Entity },
-    hudPool: { type: PropTypes.Entity },    
+    lobbySpawnPoint: { type: PropTypes.Entity },                        
   };
 
   // Singleton
   static instance: PlayerManager;
-  private weaponSelector: WeaponSelector | undefined;
 
+  private weaponSelector: WeaponSelector | undefined;
   private readonly playerStateMap = new Map<number, PlayerState>();
   private playerPersistentVariables: PlayerPersistentVariables | undefined;
   private playerPersistentCache = new Map<number, PersistentVariables>();
@@ -88,9 +62,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, this.onPlayerEnterWorld.bind(this));
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerExitWorld, this.onPlayerExitWorld.bind(this));
 
-    this.connectNetworkBroadcastEvent(playerModeRequestEvent, this.onPlayerModeRequest.bind(this));    
-    this.connectNetworkBroadcastEvent(playerPersistentStatsRequestEvent, this.onPlayerPersistentStatsRequest.bind(this));
-    this.connectNetworkEvent(this.world.getLocalPlayer(), playerShowResultsEvent, this.onPlayerShowResults.bind(this));
+    this.connectNetworkBroadcastEvent(Events.playerPersistentStatsRequest, this.onPlayerPersistentStatsRequest.bind(this));    
 
     this.connectNetworkBroadcastEvent(PlayerStartEvent, (data: {player: Player}) => {
       const player = data.player;
@@ -104,8 +76,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
     if (this.playerPersistentVariables) {
       const variables = this.playerPersistentVariables.load(player);
-      this.playerPersistentCache.set(player.id, variables);      
-      this.sendPersistentStats(player, variables);
+      this.playerPersistentCache.set(player.id, variables);
     }
   }
 
@@ -177,23 +148,8 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
       return;
     }
 
-    const mode = this.getPlayerMode(player);    
+    const mode = this.getPlayerMode(player);
   }
-
-  /*
-  private notifyPlayerMode(player: Player, mode: PlayerMode) {
-    // Debug Log
-    console.log(`[PlayerManager] notifyPlayerMode called for ${player.name.get()}. Mode: ${mode}`);
-
-    this.sendNetworkEvent(player, playerModeChangedEvent, { mode });
-
-    // Request Audio Playback based on mode
-    const soundId = mode === PlayerMode.Lobby ? 'Lobby' : 'Match';
-    
-    console.log(`[PlayerManager] Broadcasting playClientAudio event for ${player.name.get()}. SoundId: ${soundId}`);
-    this.sendNetworkBroadcastEvent(Events.playClientAudio, { playerId: player.id, soundId });
-  }
-  */
 
   public getPersistentStats(player: Player): PersistentVariables | null {
     return this.playerPersistentCache.get(player.id) ?? null;
@@ -204,19 +160,13 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
     if (!player) {
       return;
     }
-    this.sendPersistentStats(player);
-  }
 
-  private onPlayerShowResults(data: {player: Player, score: number, placement?: number}) {
-    console.log(`[PlayerManager] Game Over! Score: ${data.score}, Waves: ${data.placement ?? 0}`);
-  }
-
-  private sendPersistentStats(player: Player, stats?: PersistentVariables) {
-    const payload = stats ?? this.playerPersistentCache.get(player.id);
-    if (!payload) {
+    const stats = this.getPersistentStats(player);
+    if (!stats) {
       return;
     }
-    this.sendNetworkEvent(player, playerPersistentStatsUpdateEvent, payload);
+
+    this.sendNetworkEvent(player, Events.playerPersistentStatsUpdate, stats);
   }
 }
 Component.register(PlayerManager);

@@ -33,6 +33,17 @@ export const Events = {
   lootPickup: new NetworkEvent<{player: Player, loot: string}>('LootPickup'),
 
   // Player
+  playerPersistentStatsRequest: new NetworkEvent<{ playerId: number }>('playerPersistentStatsRequest'),
+  playerPersistentStatsUpdate: new NetworkEvent<{
+    coins: number;
+    gems: number;
+    bestWaves: number;
+    killedSlimes: number;
+  }>('playerPersistentStatsUpdate'),
+
+
+
+
   playerDeath: new NetworkEvent<{player: Player}>('PlayerDeath'),
   registerLocalPlayerController: new NetworkEvent<{ entity: Entity }>("registerLocalPlayerController"),
   playerDataUpdate: new NetworkEvent<{ammo : number, hp: number}>('playerDataUpdate'),
@@ -41,14 +52,7 @@ export const Events = {
   playerLevelUp: new NetworkEvent<{player: Player, level: number, xp: number}>('playerLevelUp'),
   playerShowResults: new NetworkEvent<{player: Player, score: number, placement?: number}>('playerShowResults'),
   playerModeChanged: new NetworkEvent<{ mode: string }>('playerModeChanged'),
-  playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),
-  playerPersistentStatsRequest: new NetworkEvent<{ playerId: number }>('playerPersistentStatsRequest'),
-  playerPersistentStatsUpdate: new NetworkEvent<{
-    coins: number;
-    gems: number;
-    bestWaves: number;
-    killedSlimes: number;
-  }>('playerPersistentStatsUpdate'),
+  playerModeRequest: new NetworkEvent<{ playerId: number }>('playerModeRequest'),  
   matchStateRequest: new NetworkEvent<{ playerId: number }>('matchStateRequest'),
   matchStateUpdate: new NetworkEvent<{
     playerId: number;
