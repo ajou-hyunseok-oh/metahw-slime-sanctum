@@ -15,7 +15,6 @@ import { SlimeSpawnController } from 'SlimeSpawnController';
 import { MatchStateManager } from 'MatchStateManager';
 import { TeamType } from 'GameConstants';
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
-import { MatchPageViewEvent } from 'MatchPageView';
 
 export class SublevelController extends Behaviour<typeof SublevelController> {
   static propsDefinition = {
@@ -230,7 +229,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       
       // 플레이어의 근접 공격 레벨을 1로 설정 (무기 지급 조건 충족)
       MatchStateManager.instance.setCombatAttributes(player, { meleeAttackLevel: 1 });
-      this.sendNetworkEvent(player, MatchPageViewEvent, { enabled: true });
+      this.sendNetworkEvent(player, Events.matchPageView, { enabled: true });
 
       // 1레벨 무기 지급
       if (WeaponSelector.Instance) {

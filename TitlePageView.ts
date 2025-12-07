@@ -7,7 +7,7 @@
 
 import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-import { PlayerStartEvent } from 'PlayerManager';
+import { Events } from 'Events';
 
 const TitlePageViewEvent = new NetworkEvent<{enabled: boolean}>("TitlePageViewEvent");
 
@@ -40,7 +40,7 @@ class TitlePageView extends Component<typeof TitlePageView> {
       if (data.enabled) {
         this.async.setTimeout(() => {
           console.log(`[TitlePageView] PlayerStartEvent Send}`);
-          this.sendNetworkBroadcastEvent(PlayerStartEvent, {player: this.world.getLocalPlayer()});
+          this.sendNetworkBroadcastEvent(Events.playerStart, {player: this.world.getLocalPlayer()});
           this.setVisibility(false);
         }, 3000);    
       }

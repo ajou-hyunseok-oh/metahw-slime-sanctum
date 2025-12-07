@@ -12,8 +12,6 @@ import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'hor
 import { WeaponSelector, WeaponType } from 'WeaponSelector';
 import { PlayerPersistentVariables, PersistentVariables } from 'PlayerPersistentVariables';
 import { MatchStateManager } from 'MatchStateManager';
-import { MatchPageViewEvent } from 'MatchPageView';
-import { LobbyPageViewEvent } from 'LobbyPageView';
 
 export enum PlayerMode {
   None = "None",
@@ -31,9 +29,6 @@ type PlayerState = {
   mode: PlayerMode;
   team: TeamType;
 };
-
-
-export const PlayerStartEvent = new NetworkEvent<{player: Player}>("PlayerStartEvent");
 
 export class PlayerManager extends Behaviour<typeof PlayerManager> {
   static propsDefinition = {
@@ -64,7 +59,7 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
     this.connectNetworkBroadcastEvent(Events.playerPersistentStatsRequest, this.onPlayerPersistentStatsRequest.bind(this));    
 
-    this.connectNetworkBroadcastEvent(PlayerStartEvent, (data: {player: Player}) => {
+    this.connectNetworkBroadcastEvent(Events.playerStart, (data: {player: Player}) => {
       const player = data.player;
       console.log(`[PlayerManager] PlayerStartEvent received for ${player.name.get()}`);
       this.setPlayerMode(player, PlayerMode.Lobby);
@@ -129,16 +124,16 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
   private onPlayerModeChanged(player: Player, mode: PlayerMode) {    
     switch (mode) {
       case PlayerMode.Lobby:        
-        this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: true});
-        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});
+        this.sendNetworkEvent(player, Events.lobbyPageView, {enabled: true});
+        this.sendNetworkEvent(player, Events.matchPageView, {enabled: false});
         this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Lobby' });
         this.matchStateManager?.exitMatch(player);
         break;
       case PlayerMode.Match:
         const team = this.getPlayerTeam(player);        
         this.matchStateManager?.enterMatch(player, { team: team });        
-        this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
-        this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: true});
+        this.sendNetworkEvent(player, Events.lobbyPageView, {enabled: false});
+        this.sendNetworkEvent(player, Events.matchPageView, {enabled: true});
         this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Match' });
         break;
     }

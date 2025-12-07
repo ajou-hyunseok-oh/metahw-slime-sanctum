@@ -9,8 +9,6 @@ import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
 import { Events } from 'Events';
 
-export const LobbyPageViewEvent = new NetworkEvent<{enabled: boolean}>("LobbyPageViewEvent");
-
 class LobbyPageView extends Component<typeof LobbyPageView> {
   start() {
     if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
@@ -22,7 +20,7 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
   
   private startServer() {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
-      this.sendNetworkEvent(player, LobbyPageViewEvent, {enabled: false});
+      this.sendNetworkEvent(player, Events.lobbyPageView, {enabled: false});
     });
   }
 
@@ -36,7 +34,7 @@ class LobbyPageView extends Component<typeof LobbyPageView> {
     this.entity.as(NoesisGizmo).dataContext = dataContext;
     const localPlayer = this.world.getLocalPlayer();
 
-    this.connectNetworkEvent(localPlayer, LobbyPageViewEvent, data => {      
+    this.connectNetworkEvent(localPlayer, Events.lobbyPageView, data => {      
       this.setVisibility(data.enabled);
       if (data.enabled) {
         this.sendNetworkBroadcastEvent(Events.playerPersistentStatsRequest, { playerId: localPlayer.id });

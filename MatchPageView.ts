@@ -7,10 +7,7 @@
 
 import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
-import type { MatchStateUpdatePayload } from 'MatchStateManager';
-
-export const MatchPageViewEvent = new NetworkEvent<{enabled: boolean}>("MatchPageViewEvent");
-export const MatchPageUpdateEvent = new NetworkEvent<MatchStateUpdatePayload>("MatchStateUpdateEvent");
+import { Events } from 'Events';
 
 /*
 const playerModeChangedEvent = (Events as unknown as {
@@ -55,7 +52,7 @@ class MatchPageView extends Component<typeof MatchPageView> {
     // Noesis dataContext can't be directly controlled from the server
     // but server can send events to the clients so that they would update their dataContexts accordingly
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {      
-      this.sendNetworkEvent(player, MatchPageViewEvent, {enabled: false});
+      this.sendNetworkEvent(player, Events.matchPageView, {enabled: false});
     });
   }
 
@@ -78,20 +75,22 @@ class MatchPageView extends Component<typeof MatchPageView> {
       events: {
         swapWeapon: () => {
           console.log("[MatchPageView] Fire Event: Swap Weapon");
+          // TODO: WeaponSelector 연동 필요
         },
         exit: () => {          
           console.log("[MatchPageView] Fire Event: Exit");
+          this.sendNetworkEvent(this.world.getServerPlayer(), Events.requestMatchExit, { playerId: this.world.getLocalPlayer().id });
         }
       }
     };
 
     this.entity.as(NoesisGizmo).dataContext = dataContext;
 
-    this.connectNetworkEvent(this.world.getLocalPlayer(), MatchPageViewEvent, data => {
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.matchPageView, data => {
       this.setVisibility(data.enabled);
     });
 
-    this.connectNetworkEvent(this.world.getLocalPlayer(), MatchPageUpdateEvent, payload => {
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.matchStateUpdate, payload => {
       dataContext.CurrentHP = payload.hpCurrent;
       dataContext.MaxHP = payload.hpMax;
       dataContext.HPText = `${payload.hpCurrent}/${payload.hpMax}`;
@@ -108,87 +107,6 @@ class MatchPageView extends Component<typeof MatchPageView> {
       dataContext.KilledSlimes = `Kills: ${payload.slimeKills}`;
     });
   }
-  /*
-  start() {
-    const localPlayer = this.world.getLocalPlayer();
-    const serverPlayer = this.world.getServerPlayer();
-
-    if (localPlayer && serverPlayer && localPlayer.id === serverPlayer.id) {
-      console.log('[TitlePageView] Server context detected; skipping client UI logic.');
-      return;
-    }
-
-    this.startClient();
-  }
-
-  private startClient() {
-    const localPlayer = this.world.getLocalPlayer();
-
-    this.connectNetworkEvent(localPlayer, playerModeChangedEvent, payload => {
-      const isMatch = payload.mode === PlayerMode.Match;
-      this.setVisibility(isMatch, localPlayer);
-    });
-
-    this.connectNetworkEvent(localPlayer, matchStateUpdateEvent, payload => {
-      this.onMatchStatsUpdated(payload);
-    });
-
-    this.connectNetworkEvent(localPlayer, playerHPUpdateEvent, (data) => {
-      const gizmo = this.entity.as(NoesisGizmo);
-      if (gizmo && gizmo.dataContext) {
-        gizmo.dataContext.CurrentHP = data.current;
-        gizmo.dataContext.MaxHP = data.max;
-        gizmo.dataContext.HPText = `${data.current}/${data.max}`;
-      }
-    });
-
-    this.setVisibility(false, localPlayer);
-  }
-
-  private setVisibility(visible: boolean, player: Player) {
-    this.entity.visible.set(visible);
-
-    if (visible) {
-      this.requestMatchStats(player);
-    }
-  }
-
-  private requestMatchStats(player: Player) {
-    this.sendNetworkBroadcastEvent(matchStateRequestEvent, { playerId: player.id });
-  }
-
-  private onMatchStatsUpdated(stats: MatchStateUpdatePayload) {
-    const localPlayer = this.world.getLocalPlayer();
-    const dataContext = {
-      CurrentHP: stats.hpCurrent,      
-      MaxHP: stats.hpMax,
-      HPText: `${stats.hpCurrent}/${stats.hpMax}`,      
-      HPLevel: `Lv ${stats.skillHpBonusLevel}`, // Added Passive Skill Level
-      CurrentXP: stats.currentXp,
-      MaxXP: stats.xpToNextLevel,
-      XPText: `${Math.floor((stats.currentXp / stats.xpToNextLevel) * 100)}%`,
-      MeleeLevel: `Lv ${stats.meleeAttackLevel}`,
-      RangedLevel: `Lv ${stats.rangedAttackLevel}`,
-      MagicLevel: `Lv ${stats.magicAttackLevel}`,
-      DefenceLevel: `Lv ${stats.skillDefenseBonusLevel}`, // Changed to show Skill Level      
-      WeaponType: "Melee",
-      WaveCount: stats.wavesSurvived === 0 ? `` : `Wave ${stats.wavesSurvived}`,
-      KilledSlimes: `Kills: ${stats.slimeKills}`,
-      events: {
-        swapWeapon: () => {
-          console.log("Swap Weapon");
-        },
-        exit: () => {
-          console.log("Exit button clicked");
-          this.sendNetworkBroadcastEvent(requestMatchExitEvent, { playerId: localPlayer.id });
-        }
-      }
-    };
-
-    this.entity.as(NoesisGizmo).dataContext = dataContext;
-  }
-  }
-  */
 }
 
 Component.register(MatchPageView);
