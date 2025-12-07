@@ -157,5 +157,28 @@ export class PlayerManager extends Behaviour<typeof PlayerManager> {
 
     this.sendNetworkEvent(player, Events.playerPersistentStatsUpdate, stats);
   }
+
+  public saveMatchResults(player: Player, results: { kills: number; waves: number; coins: number; gems: number }) {
+    const stats = this.getPersistentStats(player);
+    if (!stats) return;
+
+    // 데이터 갱신
+    stats.killedSlimes = (stats.killedSlimes || 0) + results.kills;
+    stats.bestWaves = Math.max(stats.bestWaves || 0, results.waves);
+    stats.coins = (stats.coins || 0) + results.coins;
+    stats.gems = (stats.gems || 0) + results.gems;
+
+    // 캐시 업데이트 (이미 참조이므로 stats 수정으로 반영됨, 하지만 명시적 확인)
+    this.playerPersistentCache.set(player.id, stats);
+
+    // 영구 저장
+    if (this.playerPersistentVariables) {
+      this.playerPersistentVariables.save(player, stats);
+    }
+
+    // 클라이언트 동기화
+    this.sendNetworkEvent(player, Events.playerPersistentStatsUpdate, stats);
+    console.log(`[PlayerManager] Saved match results for ${player.name.get()}. Kills: +${results.kills}, Coins: +${results.coins}`);
+  }
 }
 Component.register(PlayerManager);

@@ -10,6 +10,7 @@ import { Events } from 'Events';
 import { Component, NetworkEvent, Player, PropTypes, Vec3 } from 'horizon/core';
 import { getPlayerStats, PASSIVE_SKILL_DATA } from 'GameBalanceData';
 import { TeamType } from 'GameConstants';
+import { PlayerManager } from 'PlayerManager';
 
 export type MatchVariables = {
   hpCurrent: number;
@@ -389,8 +390,22 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   private sendResults(player: Player, state: MatchVariables) {
-     // 점수 계산 (예: 킬수 * 10 + 웨이브 * 100)
+     // 점수 계산
      const score = (state.slimeKills * 10) + (state.wavesSurvived * 100);
+
+     // 보상 계산 (임시: 킬당 2코인, 웨이브당 50코인, 5웨이브당 1젬)
+     const earnedCoins = (state.slimeKills * 2) + (state.wavesSurvived * 50);
+     const earnedGems = Math.floor(state.wavesSurvived / 5);
+
+     // 영구 데이터 저장
+     if (PlayerManager.instance) {
+       PlayerManager.instance.saveMatchResults(player, {
+         kills: state.slimeKills,
+         waves: state.wavesSurvived,
+         coins: earnedCoins,
+         gems: earnedGems
+       });
+     }
      
      this.sendNetworkEvent(player, Events.playerShowResults, { 
        player, 
