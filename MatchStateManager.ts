@@ -110,6 +110,26 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   /**
+   * 특정 팀의 모든 플레이어에게 게임 승리(클리어) 처리를 하고 결과를 전송한다.
+   * 모든 웨이브 클리어 시 호출된다.
+   */
+  public notifyTeamVictory(team: TeamType) {
+    if (!PlayerManager.instance) return;
+    
+    const players = PlayerManager.instance.getTeamPlayers(team);
+    players.forEach(player => {
+        // 사망 처리가 아니라 결과 전송만 수행
+        // notifyPlayerDeath 내부 로직과 유사하지만 사망 이벤트(HP 0)는 발생시키지 않음
+        this.sendNetworkEvent(player, Events.matchPageView, { enabled: false });
+
+        const state = this.playerStates.get(player.id);
+        if (state) {
+            this.sendResults(player, state);
+        }
+    });
+  }
+
+  /**
    * 현재 상태를 읽기 전용으로 반환한다.
    */
   public getStats(player: Player): MatchVariables | undefined {

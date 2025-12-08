@@ -84,6 +84,11 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     if (waveIndex > WAVE_DATA.length) {
         console.log("[WavePlayer] All waves completed!");
         this.currentState = WaveState.MatchEnd; 
+        
+        // 승리 처리 (결과 정산)
+        if (MatchStateManager.instance) {
+            MatchStateManager.instance.notifyTeamVictory(this.myTeam);
+        }
         return;
     }
 
