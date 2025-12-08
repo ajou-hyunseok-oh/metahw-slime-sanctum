@@ -1,3 +1,10 @@
+// Copyright (c) 2025 Hyunseok Oh / TripleN Games Inc.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+//
+// Modified by Hyunseok Oh on December 07, 2025
+
 import { Behaviour } from "Behaviour";
 import { Events } from "Events";
 import { FloatingTextManager } from "FloatingTextManager";
@@ -8,6 +15,7 @@ import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
 import { EntityHPUpdateEvent } from "HPProgressView";
+import { LootItemSpawner } from "LootItemSpawner";
 
 export enum SlimeState {
   Idle = "Idle", 
@@ -272,6 +280,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
       case SlimeState.Dead:
         this.navAgent?.isImmobile.set(true);
         this.isDead = true;        
+        this.spawnLoot();
         this.setModelVisibility(false);        
         
         if (this.props.dieSFX) {
@@ -641,6 +650,17 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     const y = start.y + (end.y - start.y) * t;
     const z = start.z + (end.z - start.z) * t;
     return new Vec3(x, y, z);
+  }
+
+  private spawnLoot() {
+    const spawner = LootItemSpawner.instance;
+    if (!spawner) {
+      return;
+    }
+
+    const position = this.entity.position.get();
+    const rotation = this.entity.rotation.get();
+    spawner.spawnForSlime(this.slimeType, position, rotation);
   }
 
   private onMeleeHit(data: { hitPos: Vec3, hitNormal: Vec3, fromPlayer: Player, damage: number, weaponType?: string }) {
