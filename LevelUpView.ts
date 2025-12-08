@@ -133,48 +133,65 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
      new Binding<string>("Lv 1"),
    ];
  
-   // 유형/레벨 조합을 무작위로 3개 선택해 바인딩에 반영
-   private pickRandomCards() {
-     const picks: Array<{ type: string; level: number }> = [];
-     const typePool = [...this.skillTypes];
- 
-     for (let i = 0; i < 3; i++) {
-       if (typePool.length === 0) break;
-       const typeIdx = Math.floor(Math.random() * typePool.length);
-       const type = typePool.splice(typeIdx, 1)[0]; // 유형 중복 방지
-       const level = Math.max(
-         1,
-         Math.min(
-           this.maxLevel,
-           Math.floor(Math.random() * this.maxLevel) + 1
-         )
-       );
-       picks.push({ type, level });
-     }
- 
-     const targetBindings = [
-       { title: this.btnLabels[0], desc: this.descLabels[0], lvl: this.levelLabels[0] },
-       { title: this.btnLabels[1], desc: this.descLabels[1], lvl: this.levelLabels[1] },
-       { title: this.btnLabels[2], desc: this.descLabels[2], lvl: this.levelLabels[2] },
-     ];
- 
-     picks.forEach((p, idx) => {
-       const tgt = targetBindings[idx];
-       if (!tgt) return;
-       // 레벨을 로마 숫자로 변환하여 타이틀에 적용
-       const roman = this.toRoman(p.level);
-       tgt.title.set(`${p.type} ${roman}`);
-       const descBase = this.skillDesc[p.type] ?? `${p.type} Level +`;
-       const eff = this.skillLevelEffects[p.type]?.[p.level - 1];
-       const descValue = eff !== undefined ? `${descBase} ${eff}` : `${descBase} ${p.level}`;
-       tgt.desc.set(descValue);
-       tgt.lvl.set(`Lv ${p.level}`);
-       this.currentBackgrounds[idx] = this.getBgForType(p.type);
-       this.currentIcons[idx] = this.getIconForType(p.type);
-     });
- 
-     this.currentChoices = picks;
-   }
+    // 최초 실행: 무기 선택 (Melee, Range, Magic 1레벨 고정)
+    private pickFirstCard() {
+        const picks: Array<{ type: string; level: number }> = [
+            { type: "Melee", level: 1 },
+            { type: "Range", level: 1 },
+            { type: "Magic", level: 1 },
+        ];
+
+        this.applyCardBindings(picks);
+    }
+
+    // 이후 실행: 5개 스킬 중 3개 무작위 선택
+    private pickNextCard() {
+        const picks: Array<{ type: string; level: number }> = [];
+        const typePool = [...this.skillTypes];
+    
+        for (let i = 0; i < 3; i++) {
+          if (typePool.length === 0) break;
+          const typeIdx = Math.floor(Math.random() * typePool.length);
+          const type = typePool.splice(typeIdx, 1)[0]; // 유형 중복 방지
+          
+          // 임시로 랜덤 레벨 유지 (추후 MatchState 연동 시 수정 가능)
+          const level = Math.max(
+            1,
+            Math.min(
+              this.maxLevel,
+              Math.floor(Math.random() * this.maxLevel) + 1
+            )
+          );
+          picks.push({ type, level });
+        }
+        
+        this.applyCardBindings(picks);
+    }
+
+    private applyCardBindings(picks: Array<{ type: string; level: number }>) {
+        const targetBindings = [
+          { title: this.btnLabels[0], desc: this.descLabels[0], lvl: this.levelLabels[0] },
+          { title: this.btnLabels[1], desc: this.descLabels[1], lvl: this.levelLabels[1] },
+          { title: this.btnLabels[2], desc: this.descLabels[2], lvl: this.levelLabels[2] },
+        ];
+    
+        picks.forEach((p, idx) => {
+          const tgt = targetBindings[idx];
+          if (!tgt) return;
+          // 레벨을 로마 숫자로 변환하여 타이틀에 적용
+          const roman = this.toRoman(p.level);
+          tgt.title.set(`${p.type} ${roman}`);
+          const descBase = this.skillDesc[p.type] ?? `${p.type} Level +`;
+          const eff = this.skillLevelEffects[p.type]?.[p.level - 1];
+          const descValue = eff !== undefined ? `${descBase} ${eff}` : `${descBase} ${p.level}`;
+          tgt.desc.set(descValue);
+          tgt.lvl.set(`Lv ${p.level}`);
+          this.currentBackgrounds[idx] = this.getBgForType(p.type);
+          this.currentIcons[idx] = this.getIconForType(p.type);
+        });
+    
+        this.currentChoices = picks;
+    }
  
    // 실제 스킬 적용 로직 (필요시 외부 시스템과 연동)
    private applySkill(choice: { type: string; level: number } | undefined) {
@@ -400,7 +417,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
  
    initializeUI() {
      // 최초 렌더 전에 유형별 배경/아이콘과 텍스트를 세팅
-     this.pickRandomCards();
+     this.pickFirstCard();
      return View({
        children: [
          // 타이틀
@@ -486,7 +503,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
         if (localPlayer && (localPlayer.id === data.playerId || (localName !== "" && localName === data.playerName) || localName === "")) {
             // 내 UI라면 보이고 카드 섞기
             this.entity.visible.set(true);
-            this.pickRandomCards();
+            this.pickFirstCard();
         } else {
             // 내 UI가 아니면 숨김
             this.entity.visible.set(false);
@@ -506,7 +523,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
              // 로컬 플레이어 본인인지 재확인 (혹시 모를 중복 방지)
              if (localPlayer && (localPlayer.id === this.ownerPlayerId || (localName !== "" && localName === data.player.name.get()) || localName === "")) {
                 this.entity.visible.set(true);
-                this.pickRandomCards();
+                this.pickNextCard();
              }
         }
     });
