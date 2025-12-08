@@ -23,16 +23,17 @@ export class LootItemSpawner extends Behaviour<typeof LootItemSpawner> {
   private readonly freeEntities: Set<Entity> = new Set();
   private pendingCount: number = 0;
   private readonly poolRestingPosition: Vec3 = new Vec3(0, -9999, 0);
+  private readonly scatterRadius: number = 0.8;
 
   /** 슬라임 타입별 드롭 테이블 (가중치 합산 방식) */
   private readonly dropTables: Record<SlimeType, { type: ItemType | null; weight: number }[]> = {
     [SlimeType.Blue]: [
-      { type: ItemType.Coin, weight: 60 },
-      { type: ItemType.Gem, weight: 5 },
+      { type: ItemType.Coin, weight: 20 },
+      { type: ItemType.Gem, weight: 20 },
       { type: ItemType.HealthPotion, weight: 20 },
-      { type: ItemType.DefenceUpPotion, weight: 10 },
-      { type: ItemType.AttackSpeedUpPotion, weight: 5 },
-      { type: null, weight: 25 }, // 드롭 없음
+      { type: ItemType.DefenceUpPotion, weight: 20 },
+      { type: ItemType.AttackSpeedUpPotion, weight: 20 },
+      { type: null, weight: 0 }, // 드롭 없음
     ],
     [SlimeType.Pink]: [
       { type: ItemType.Coin, weight: 40 },
@@ -145,11 +146,12 @@ export class LootItemSpawner extends Behaviour<typeof LootItemSpawner> {
       return;
     }
 
+    const origin = position.add(new Vec3(0, 0.2, 0));
+    const target = this.getScatterPosition(origin);
+
     loot.assignSpawner(this);
-    loot.setItemType(itemType);
-    entity.position.set(position);
-    entity.rotation.set(rotation);
-    loot.setActive(true);
+    loot.setItemType(itemType, false);
+    loot.beginSpawn(origin, target, rotation);
   }
 
   private pickLootEntity(entities: Entity[]): Entity | undefined {
@@ -204,6 +206,14 @@ export class LootItemSpawner extends Behaviour<typeof LootItemSpawner> {
     }
     // 폴백
     return table[table.length - 1].type;
+  }
+
+  private getScatterPosition(base: Vec3): Vec3 {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.sqrt(Math.random()) * this.scatterRadius;
+    const offsetX = Math.cos(angle) * radius;
+    const offsetZ = Math.sin(angle) * radius;
+    return new Vec3(base.x + offsetX, base.y, base.z + offsetZ);
   }
 }
 Component.register(LootItemSpawner);

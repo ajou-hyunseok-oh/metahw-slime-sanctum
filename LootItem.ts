@@ -7,7 +7,7 @@
 
 import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
-import { AudioGizmo, Component, Entity, ParticleGizmo, Player, PropTypes, CodeBlockEvents } from 'horizon/core';
+import { AudioGizmo, Component, Entity, ParticleGizmo, Player, PropTypes, CodeBlockEvents, Vec3, Quaternion } from 'horizon/core';
 import { MatchStateManager } from 'MatchStateManager';
 import { PlayerManager } from 'PlayerManager';
 import type { LootItemSpawner } from 'LootItemSpawner';
@@ -19,6 +19,12 @@ export enum ItemType {
   HealthPotion = "healthPotion",
   DefenceUpPotion = "defenceUpPotion",
   AttackSpeedUpPotion = "attackSpeedUpPotion",
+}
+
+export enum ItemState {
+  Spawned = "spawned",
+  Floating = "floating",
+  Collected = "collected",
 }
 
 // LootItem 클래스: 아이템 관련 로직 담당
@@ -43,7 +49,19 @@ export class LootItem extends Behaviour<typeof LootItem> {
   private sfxCollect?: AudioGizmo;
   private owningSpawner?: LootItemSpawner;
   private isActive: boolean = false;
+  private state: ItemState = ItemState.Collected;
   private recycleTimer?: number;
+  private bobTime: number = 0;
+  private baseItemPos?: Vec3;
+  private baseItemRot?: Quaternion;
+  private spawnStartPos?: Vec3;
+  private spawnTargetPos?: Vec3;
+  private spawnElapsed: number = 0;
+  private readonly bobAmplitude: number = 0.12;
+  private readonly bobSpeed: number = 2.5;
+  private readonly rotSpeed: number = 0.8;
+  private readonly spawnDuration: number = 0.55; // 비행 연출 시간
+  private readonly spawnArcHeight: number = 0.6;
 
   private static attackBuffTimers: Map<number, number> = new Map();
 
@@ -54,8 +72,53 @@ export class LootItem extends Behaviour<typeof LootItem> {
     this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterTrigger, this.OnPlayerCollision.bind(this));
   }
 
+  Update(deltaTime: number) {
+    if (!this.isActive || !this.itemEntity) {
+      return;
+    }
+
+    if (this.state === ItemState.Spawned && this.spawnStartPos && this.spawnTargetPos) {
+      this.spawnElapsed += deltaTime;
+      const t = Math.min(1, this.spawnElapsed / this.spawnDuration);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const pos = new Vec3(
+        this.spawnStartPos.x + (this.spawnTargetPos.x - this.spawnStartPos.x) * eased,
+        this.spawnStartPos.y +
+          (this.spawnTargetPos.y - this.spawnStartPos.y) * eased +
+          Math.sin(Math.PI * eased) * this.spawnArcHeight,
+        this.spawnStartPos.z + (this.spawnTargetPos.z - this.spawnStartPos.z) * eased
+      );
+      this.itemEntity.position.set(pos);
+
+      if (t >= 1) {
+        this.state = ItemState.Floating;
+        this.bobTime = 0;
+        this.baseItemPos = this.spawnTargetPos;
+        this.baseItemRot = this.itemEntity.rotation.get();
+        this.spawnStartPos = undefined;
+        this.spawnTargetPos = undefined;
+        this.refreshSparkleState();
+      }
+      return;
+    }
+
+    if (this.state !== ItemState.Floating || !this.baseItemPos || !this.baseItemRot) {
+      return;
+    }
+
+    this.bobTime += deltaTime;
+    const yOffset = Math.sin(this.bobTime * this.bobSpeed) * this.bobAmplitude;
+    const newPos = new Vec3(this.baseItemPos.x, this.baseItemPos.y + yOffset, this.baseItemPos.z);
+    this.itemEntity.position.set(newPos);
+
+    const rot = Quaternion.fromAxisAngle(new Vec3(0, 1, 0), this.bobTime * this.rotSpeed);
+    this.itemEntity.rotation.set(Quaternion.mul(this.baseItemRot, rot));
+
+    this.syncSparklePosition();
+  }
+
   // 아이템 타입 설정 및 관련 엔티티/이펙트 로딩
-  public setItemType(itemType: ItemType) {
+  public setItemType(itemType: ItemType, activate: boolean = true) {
     this.itemType = itemType;
 
     switch (itemType) {
@@ -84,14 +147,30 @@ export class LootItem extends Behaviour<typeof LootItem> {
         this.sfxCollect = undefined;
     }
 
-    this.setActive(true);
+    if (activate) {
+      this.setActive(true);
+    }
+  }
+
+  public beginSpawn(origin: Vec3, target: Vec3, rotation: Quaternion) {
+    this.state = ItemState.Spawned;
+    this.spawnStartPos = origin;
+    this.spawnTargetPos = target;
+    this.spawnElapsed = 0;
+
+    this.entity.rotation.set(rotation);
+    this.entity.position.set(origin);
+    this.setActive(true, false); // 충돌 없이 연출만 수행, 플로팅 기준점은 도착 시 세팅
+    this.refreshSparkleState(); // Spawned 구간에서는 비활성화
   }
 
   // 아이템 획득 시 호출
   public collect(player?: Player) {
     if (!this.isActive) return;
 
+    this.state = ItemState.Collected;
     this.setActive(false);
+    this.refreshSparkleState();
     
     if (this.sfxCollect) {
       this.sfxCollect.play();
@@ -109,7 +188,7 @@ export class LootItem extends Behaviour<typeof LootItem> {
   }
 
   // 아이템 활성화/비활성화 및 이펙트 관리
-  public setActive(active: boolean) {
+  public setActive(active: boolean, setFloatingBase: boolean = true) {
     this.isActive = active;
 
     // 재활용 타이머가 남아 있을 때 새로 활성화되면 정리
@@ -118,29 +197,34 @@ export class LootItem extends Behaviour<typeof LootItem> {
       this.recycleTimer = undefined;
     }
 
-    // 루트 엔티티 충돌 상태도 함께 제어
-    try {
-      this.entity.collidable.set(active);
-    } catch (_) {
-      // collidable 속성이 없는 경우 무시
-    }
-
-
     if (this.itemEntity) {
       this.itemEntity.visible.set(active);
+      if (active) {
+        // 풀에서 복귀할 때 항상 보이도록 루트 가시성도 보장
+        try {
+          this.entity.visible.set(true);
+        } catch (_) {}
+
+        if (setFloatingBase) {
+          this.bobTime = 0;
+          this.baseItemPos = this.itemEntity.position.get();
+          this.baseItemRot = this.itemEntity.rotation.get();
+          this.state = ItemState.Floating;
+        }
+      }
     }
 
-    if (this.vfxSparkle) {
-      active ? this.vfxSparkle.play() : this.vfxSparkle.stop();
-    }
+    this.refreshSparkleState();
   }
 
   public assignSpawner(spawner: LootItemSpawner) {
     this.owningSpawner = spawner;
   }
 
-  protected override OnPlayerCollision(player: Player) {
-    this.handlePickup(player);
+  protected override OnPlayerCollision(target: Player | Entity) {
+    if (!(target instanceof Player)) return; // 플레이어가 아닌 충돌은 무시
+    if (this.state !== ItemState.Floating) return; // 비행 중 또는 회수 중에는 무시
+    this.handlePickup(target);
   }
 
   private handlePickup(player: Player) {
@@ -233,6 +317,26 @@ export class LootItem extends Behaviour<typeof LootItem> {
     });
 
     LootItem.attackBuffTimers.delete(player.id);
+  }
+
+  private refreshSparkleState() {
+    if (!this.vfxSparkle) return;
+
+    if (this.isActive && this.state === ItemState.Floating) {
+      this.vfxSparkle.play();
+      this.syncSparklePosition();
+      return;
+    }
+
+    this.vfxSparkle.stop();
+  }
+
+  private syncSparklePosition() {
+    if (!this.vfxSparkle || !this.itemEntity) return;
+    const vfxEntity = (this.vfxSparkle as any).entity as Entity | undefined;
+    if (vfxEntity) {
+      vfxEntity.position.set(this.itemEntity.position.get());
+    }
   }
 }
 
