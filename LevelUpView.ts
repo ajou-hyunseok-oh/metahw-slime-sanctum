@@ -40,8 +40,11 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
   private currentChoices: Array<{ type: string; level: number }> = [];
   private ownerPlayerId: number = -1;
   private currentBackgrounds: Array<hz.Asset | undefined> = [undefined, undefined, undefined];
-   private currentIcons: Array<hz.Asset | undefined> = [undefined, undefined, undefined];
-   private overlayDisplay = new Binding<string>("flex");
+  private currentIcons: Array<hz.Asset | undefined> = [undefined, undefined, undefined];
+  // 카드별 유형별 가시성 토글 (배경/아이콘)
+  private bgDisplays: Binding<string>[][] = [];
+  private iconDisplays: Binding<string>[][] = [];
+  private overlayDisplay = new Binding<string>("flex");
    private skillDesc: Record<string, string> = {
      Melee: "Melee Attack Level +",
      Range: "Range Attack Level +",
@@ -152,10 +155,38 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
         defense: number;
         health: number;
     }) {
+        const picks: Array<{ type: string; level: number }> = [];
+        const typePool = [...this.skillTypes]; // 중복 방지용 풀
 
+        for (let i = 0; i < 3; i++) {
+            if (typePool.length === 0) break;
+
+            const idx = Math.floor(Math.random() * typePool.length);
+            const type = typePool.splice(idx, 1)[0]; // 하나 꺼내고 풀에서 제거
+
+            // 기본 레벨 계산: 전달된 stats가 있으면 +1, 없으면 1
+            let level = 1;
+            if (currentStats) {
+                switch (type) {
+                    case "Melee": level = currentStats.melee + 1; break;
+                    case "Range": level = currentStats.ranged + 1; break;
+                    case "Magic": level = currentStats.magic + 1; break;
+                    case "Defense": level = currentStats.defense + 1; break;
+                    case "Health": level = currentStats.health + 1; break;
+                }
+            }
+
+            // 최대 레벨 상한
+            level = Math.min(level, this.maxLevel);
+
+            picks.push({ type, level });
+        }
+
+        this.applyCardBindings(picks);
     }
 
     private applyCardBindings(picks: Array<{ type: string; level: number }>) {
+        console.log("[LevelUpView] applyCardBindings picks:", picks.map((p, i) => `${i}:${p.type}-${p.level}`).join(", "));
         const targetBindings = [
           { title: this.btnLabels[0], desc: this.descLabels[0], lvl: this.levelLabels[0] },
           { title: this.btnLabels[1], desc: this.descLabels[1], lvl: this.levelLabels[1] },
@@ -173,8 +204,20 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
           const descValue = eff !== undefined ? `${descBase} ${eff}` : `${descBase} ${p.level}`;
           tgt.desc.set(descValue);
           tgt.lvl.set(`Lv ${p.level}`);
-          this.currentBackgrounds[idx] = this.getBgForType(p.type);
-          this.currentIcons[idx] = this.getIconForType(p.type);
+          const bgAsset = this.getBgForType(p.type);
+          const iconAsset = this.getIconForType(p.type);
+          this.currentBackgrounds[idx] = bgAsset;
+          this.currentIcons[idx] = iconAsset;
+
+          // 모든 유형 숨김 후 선택된 유형만 표시
+          this.bgDisplays[idx].forEach((b) => b.set("none"));
+          this.iconDisplays[idx].forEach((b) => b.set("none"));
+          const typeIndex = this.skillTypes.indexOf(p.type);
+          if (typeIndex >= 0) {
+            this.bgDisplays[idx][typeIndex].set(bgAsset ? "flex" : "none");
+            this.iconDisplays[idx][typeIndex].set(iconAsset ? "flex" : "none");
+          }
+          console.log(`[LevelUpView] applyCardBindings bg/icon -> idx:${idx}, type:${p.type}, bg:${this.currentBackgrounds[idx] ? "set" : "none"}, icon:${this.currentIcons[idx] ? "set" : "none"}`);
         });
     
         this.currentChoices = picks;
@@ -201,34 +244,61 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
   }
  
    // 카드용 배경 이미지 렌더
-   renderBgImage(asset?: hz.Asset) {
-     if (!asset) return null;
-     const src = ImageSource.fromTextureAsset(asset);
-     return Image({
-       source: src,
+   // 배경/아이콘 레이어: 5종 미리 그려두고 표시/숨김
+   renderBgLayers(cardIdx: number) {
+     const layers = this.skillTypes.map((t, ti) => {
+       const asset = this.getBgForType(t);
+       if (!asset) return null;
+       const src = ImageSource.fromTextureAsset(asset);
+       return Image({
+         source: src,
+         style: {
+           position: "absolute",
+           top: 0,
+           left: 0,
+           right: 0,
+           bottom: 0,
+           width: "100%",
+           height: "100%",
+           resizeMode: "cover",
+           borderRadius: 16,
+           display: this.bgDisplays[cardIdx][ti],
+         },
+       });
+     }).filter(Boolean) as ReturnType<typeof Image>[];
+
+     return View({
+       children: layers,
        style: {
          position: "absolute",
          top: 0,
          left: 0,
          right: 0,
          bottom: 0,
-         width: "100%",
-         height: "100%",
-         resizeMode: "cover",
-         borderRadius: 16,
        },
      });
    }
- 
-   renderIcon(asset: hz.Asset | undefined, level: Binding<string>) {
-     if (!asset) {
+
+   renderIconLayers(cardIdx: number, level: Binding<string>) {
+     const layers = this.skillTypes.map((t, ti) => {
+       const asset = this.getIconForType(t);
+       if (!asset) return null;
+       const src = ImageSource.fromTextureAsset(asset);
        return View({
          children: [
+           Image({
+             source: src,
+             style: {
+               width: 120,
+               height: 120,
+               resizeMode: "contain",
+             },
+           }),
            Text({
              text: level,
              style: {
                color: "white",
-               fontFamily: "Roboto",
+               fontFamily: this.FONT_LEVEL,
                fontWeight: "700",
                fontSize: 14,
                position: "absolute",
@@ -246,35 +316,13 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
            position: "relative",
            alignItems: "center",
            justifyContent: "center",
+           display: this.iconDisplays[cardIdx][ti],
          },
        });
-     }
-     const src = ImageSource.fromTextureAsset(asset);
+     }).filter(Boolean) as ReturnType<typeof View>[];
+
      return View({
-       children: [
-         Image({
-           source: src,
-           style: {
-             width: 120,
-             height: 120,
-             resizeMode: "contain",
-           },
-         }),
-         Text({
-           text: level,
-           style: {
-             color: "white",
-             fontFamily: this.FONT_LEVEL,
-             fontWeight: "700",
-             fontSize: 14,
-             position: "absolute",
-             right: 8,
-             bottom: 8,
-             textShadowColor: "black",
-             textShadowRadius: 3,
-           },
-         }),
-       ],
+       children: layers,
        style: {
          width: 120,
          height: 120,
@@ -286,16 +334,14 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
      });
    }
  
-   // 공통 버튼 스타일 생성 함수
-   createButton(
-     label: Binding<string>,
-     desc: Binding<string>,
-     level: Binding<string>,
-     index: number,
-     backgroundColor: string,
-     asset?: hz.Asset,
-     iconAsset?: hz.Asset
-   ) {
+  // 공통 버튼 스타일 생성 함수 (레이어 프리로드 후 표시/숨김)
+  createButton(
+    label: Binding<string>,
+    desc: Binding<string>,
+    level: Binding<string>,
+    index: number,
+    backgroundColor: string
+  ) {
      const clickAsset = this.props.clickSound as hz.Entity | undefined;
      // 화면 높이의 60%를 카드 높이로 사용하고, 폭은 1:2 비율로 계산
      // panelHeight가 실제 런타임 높이로 주어지면 그대로 사용하고, 없을 때는 100을 기준으로 계산
@@ -306,8 +352,8 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
      const pressScale = new AnimatedBinding(1);
      return View({
        children: [
-         // 배경 이미지 (있으면 표시)
-         this.renderBgImage(asset),
+        // 배경 이미지 레이어 (타입별 미리 생성, 표시/숨김)
+        this.renderBgLayers(index),
          Pressable({
            children: View({
              children: [
@@ -322,7 +368,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
                    textShadowRadius: 4,
                  },
                }),
-               this.renderIcon(iconAsset, level),
+              this.renderIconLayers(index, level),
                Text({
                  text: desc,
                  style: {
@@ -348,7 +394,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
                    marginTop: 16,
                    width: "100%",
                    height: 48,
-                   backgroundColor: asset ? "rgba(0,0,0,0.2)" : "#5cc600",
+                  backgroundColor: this.currentBackgrounds[index] ? "rgba(0,0,0,0.2)" : "#5cc600",
                    alignItems: "center",
                    justifyContent: "center",
                    borderBottomLeftRadius: 12,
@@ -387,7 +433,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
              pressScale.set(Animation.timing(1.02, { duration: 120, easing: Easing.inOut(Easing.ease) }));
            },
            style: {
-             backgroundColor: asset ? "rgba(0,0,0,0.15)" : backgroundColor,
+             backgroundColor: this.currentBackgrounds[index] ? "rgba(0,0,0,0.15)" : backgroundColor,
              borderRadius: 16,
              width: cardWidth,
              height: cardHeight,
@@ -413,6 +459,20 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
  
    initializeUI() {
      // 최초 렌더 전에 유형별 배경/아이콘과 텍스트를 세팅
+    // 레이어 가시성 초기화
+    this.bgDisplays = [];
+    this.iconDisplays = [];
+    for (let c = 0; c < 3; c++) {
+      const bgRow: Binding<string>[] = [];
+      const iconRow: Binding<string>[] = [];
+      for (let t = 0; t < this.skillTypes.length; t++) {
+        bgRow.push(new Binding<string>("none"));
+        iconRow.push(new Binding<string>("none"));
+      }
+      this.bgDisplays.push(bgRow);
+      this.iconDisplays.push(iconRow);
+    }
+
      this.pickFirstCard();
      return View({
        children: [
@@ -435,27 +495,21 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
                this.descLabels[0],
                this.levelLabels[0],
                0,
-               "#ffffff",
-               this.currentBackgrounds[0],
-               this.currentIcons[0]
+               "#ffffff"
              ),
              this.createButton(
                this.btnLabels[1],
                this.descLabels[1],
                this.levelLabels[1],
                1,
-               "#ffffff",
-               this.currentBackgrounds[1],
-               this.currentIcons[1]
+               "#ffffff"
              ),
              this.createButton(
                this.btnLabels[2],
                this.descLabels[2],
                this.levelLabels[2],
                2,
-               "#ffffff",
-               this.currentBackgrounds[2],
-               this.currentIcons[2]
+               "#ffffff"
              ),
            ],
            style: {
