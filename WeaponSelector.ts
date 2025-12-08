@@ -73,6 +73,26 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
   private readonly playerStates = new Map<number, EquippedState>();
   private readonly playerRequestIds = new Map<number, number>();
 
+  private readonly DEFAULT_LOCOMOTION_SPEED = 4.5;
+  private readonly DEFAULT_JUMP_SPEED = 4.3;
+  private readonly WEAPON_SWAP_LOCK_MS = 2000;
+
+  private setPlayerMovement(player: Player, enabled: boolean) {
+    if (!player) return;
+    try {
+      player.locomotionSpeed.set(enabled ? this.DEFAULT_LOCOMOTION_SPEED : 0);
+      player.jumpSpeed.set(enabled ? this.DEFAULT_JUMP_SPEED : 0);
+    } catch (error) {
+      console.warn(`[WeaponSelector] 플레이어 이동 제어 실패:`, error);
+    }
+  }
+
+  private async applySwapLockPenalty() {
+    await new Promise<void>((resolve) => {
+      this.async.setTimeout(() => resolve(), this.WEAPON_SWAP_LOCK_MS);
+    });
+  }
+
   Awake() {
     WeaponSelector.instance = this;
   }
@@ -89,19 +109,22 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
       return;
     }
 
-    const asset = this.getWeaponAsset(weaponType, level);
-    if (!asset) {
-      return;
-    }
-
-    const playerId = player.id;
-    const requestId = this.nextRequestId(playerId);
-
-    await this.despawnCurrentWeapon(playerId);
-
-    const { position, rotation } = this.getSpawnTransform(player);
+    // 플레이어 이동 고정
+    this.setPlayerMovement(player, false);
 
     try {
+      const asset = this.getWeaponAsset(weaponType, level);
+      if (!asset) {
+        return;
+      }
+
+      const playerId = player.id;
+      const requestId = this.nextRequestId(playerId);
+
+      await this.despawnCurrentWeapon(playerId);
+
+      const { position, rotation } = this.getSpawnTransform(player);
+
       const spawnedEntities = await this.world.spawnAsset(asset, position, rotation);
       if (!this.isLatestRequest(playerId, requestId)) {
         await this.safeDeleteEntities(spawnedEntities);
@@ -133,6 +156,10 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
 
     } catch (error) {
       console.error('[WeaponSelector] 무기 스폰 실패:', error);
+    } finally {
+      // 고정 페널티 적용 후 이동 복구
+      await this.applySwapLockPenalty();
+      this.setPlayerMovement(player, true);
     }
   }
 
