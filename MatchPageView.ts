@@ -58,9 +58,9 @@ class MatchPageView extends Component<typeof MatchPageView> {
           // TODO: WeaponSelector 연동 필요
         },
         exit: () => {          
-          console.log("[MatchPageView] Fire Event: Exit");
-          this.setVisibility(false);
-          this.sendNetworkEvent(this.world.getLocalPlayer(), Events.resultPageView, { enabled: true });
+          console.log("[MatchPageView] Fire Event: Exit (Request Server)");
+          // 서버에 종료 요청을 보내면 MatchStateManager가 처리 후 결과 화면(ResultPageView) 이벤트를 보냄
+          this.sendNetworkBroadcastEvent(Events.requestMatchExit, { playerId: this.world.getLocalPlayer().id });
         }
       }
     };

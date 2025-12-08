@@ -28,10 +28,10 @@ class ResultPageView extends Component<typeof ResultPageView> {
   private startClient() {
     const dataContext = {
       WaveMessage: `Wave ${99}`,
-      WaveCount: 99,
+      WaveCount: `${99} Waves`,
       KilledSlimes: `Kills: ${999}`,
-      Coins: 9999,
-      Gems: 9999,
+      Coins: `${9999} Coins`,
+      Gems: `${9999} Gems`,
       events: {
         goLobby: () => {
           console.log("[ResultPageView] Go Lobby");                    
@@ -47,6 +47,16 @@ class ResultPageView extends Component<typeof ResultPageView> {
 
     this.connectNetworkEvent(this.world.getLocalPlayer(), Events.resultPageView, data => {
       this.setVisibility(data.enabled);
+    });
+
+    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.matchResultUpdate, data => {
+      this.setVisibility(true);
+
+      dataContext.WaveMessage = ``;
+      dataContext.WaveCount = `${data.waves} Waves`;
+      dataContext.KilledSlimes = `${data.kills} Kills`;
+      dataContext.Coins = `${data.coins} Coins`;
+      dataContext.Gems = `${data.gems} Gems`;
     });
   }
 

@@ -95,6 +95,21 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   /**
+   * 특정 팀의 모든 플레이어를 패배(사망) 처리하고 결과를 전송한다.
+   * 코어 파괴 등 게임 패배 시 호출된다.
+   */
+  public notifyTeamDefeat(team: TeamType) {
+    if (!PlayerManager.instance) return;
+    
+    const players = PlayerManager.instance.getTeamPlayers(team);
+    players.forEach(player => {
+        // HP를 0으로 만들고 사망 처리
+        this.patchStats(player, { hpCurrent: 0 });
+        this.notifyPlayerDeath(player);
+    });
+  }
+
+  /**
    * 현재 상태를 읽기 전용으로 반환한다.
    */
   public getStats(player: Player): MatchVariables | undefined {
@@ -465,8 +480,12 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   private notifyPlayerDeath(player: Player) {
       console.log(`[MatchStateManager] Player ${player.name.get()} died.`);
       this.sendNetworkBroadcastEvent(Events.playerDied, { playerId: player.id });
-      this.sendNetworkEvent(player, Events.matchPageView, { enabled: false });
-      this.sendNetworkEvent(player, Events.resultPageView, { enabled: true });
+      this.sendNetworkEvent(player, Events.matchPageView, { enabled: false });      
+      
+      const state = this.playerStates.get(player.id);
+      if (state) {
+          this.sendResults(player, state);
+      }
   }
 
   private sendResults(player: Player, state: MatchVariables) {
@@ -487,6 +506,15 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
        });
      }
      
+     // 결과 화면 표시 (ResultPageView와 연동)
+     this.sendNetworkEvent(player, Events.matchResultUpdate, { 
+       player: player, 
+       waves: state.wavesSurvived, 
+       kills: state.slimeKills, 
+       coins: earnedCoins, 
+       gems: earnedGems 
+     });
+
      this.sendNetworkEvent(player, Events.playerShowResults, { 
        player, 
        score,

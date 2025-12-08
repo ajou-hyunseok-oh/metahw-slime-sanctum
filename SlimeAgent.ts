@@ -137,7 +137,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.navAgent.getNavMesh().then(mesh => { this.navMesh = mesh!; });
 
     this.connectNetworkEvent(this.props.collider ?? this.entity, Events.meleeHit, this.onMeleeHit.bind(this));
-    this.connectNetworkEvent(this.entity, Events.meleeHit, this.onMeleeHit.bind(this));    
+    this.connectNetworkEvent(this.entity, Events.meleeHit, this.onMeleeHit.bind(this));
+    
   }
 
 

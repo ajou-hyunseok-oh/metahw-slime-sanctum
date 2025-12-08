@@ -6,6 +6,7 @@ import { Events } from 'Events';
 import { PlayerPersistentVariables } from 'PlayerPersistentVariables';
 import { PlayerManager, TeamType } from 'PlayerManager';
 import { EntityHPUpdateEvent } from "HPProgressView";
+import { MatchStateManager } from 'MatchStateManager';
 
 enum WaveState {
   Ready = "Ready",
@@ -129,6 +130,12 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     // 플레이어 기록 저장
     this.UpdatePlayerRecords();
 
+    // MatchStateManager에 현재 웨이브 진행 상황 업데이트
+    const players = PlayerManager.instance.getTeamPlayers(this.myTeam);
+    players.forEach(player => {
+        MatchStateManager.instance.setWaveProgress(player, this.currentWave);
+    });
+
     // 다음 웨이브 준비
     this.async.setTimeout(() => {
         this.StartWave(this.currentWave + 1);
@@ -187,12 +194,10 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     // Kill all slimes
     this.slimeSpawnController?.killAllSlimes();
 
-    // Show Death Page to All Players in Team
-    const players = PlayerManager.instance.getTeamPlayers(this.myTeam);
-    players.forEach(p => {
-        this.sendNetworkEvent(p, Events.resultPageView, { enabled: true });
-        this.sendNetworkEvent(p, Events.matchPageView, { enabled: false }); // Hide HUD
-    });
+    // MatchStateManager를 통해 패배 처리 (결과창 표시 포함)
+    if (MatchStateManager.instance) {
+        MatchStateManager.instance.notifyTeamDefeat(this.myTeam);
+    }
 
     // Reset Game after delay? or Wait for user input in DeathPage
     // For now, let's just show the death page.

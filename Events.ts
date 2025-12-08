@@ -102,15 +102,16 @@ export const Events = {
   lootPickup: new NetworkEvent<{ player: Player, loot: string }>('lootPickup'),
 
   // =================================================================================
-    // UI & Audio
-    // =================================================================================
-    setOwner: new NetworkEvent<{ playerId: number, playerName: string }>('SetOwner'),
-    matchPageView: new NetworkEvent<{ enabled: boolean }>('MatchPageViewEvent'),
+  // UI & Audio
+  // =================================================================================
+  setOwner: new NetworkEvent<{ playerId: number, playerName: string }>('SetOwner'),
+  matchPageView: new NetworkEvent<{ enabled: boolean }>('MatchPageViewEvent'),
   lobbyPageView: new NetworkEvent<{ enabled: boolean }>('LobbyPageViewEvent'),
   deathPageView: new NetworkEvent<{ enabled: boolean }>('DeathPageViewEvent'),
   resultPageView: new NetworkEvent<{ enabled: boolean }>('ResultPageViewEvent'),
   
   loadingProgressUpdate: new NetworkEvent<{ progress: number }>('loadingProgressUpdate'),
+  matchResultUpdate: new NetworkEvent<{ player: Player, waves: number, kills: number, coins: number, gems: number }>('matchResultUpdate'),
   
   // =================================================================================
   // Wave & Sanctum Events
