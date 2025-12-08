@@ -54,7 +54,19 @@ export const Events = {
   }>('playerPersistentStatsUpdate'),
 
   // 레벨업 및 데이터 업데이트
-  playerLevelUp: new NetworkEvent<{ player: Player, level: number, xp: number }>('playerLevelUp'),
+  playerLevelUp: new NetworkEvent<{ 
+    player: Player, 
+    level: number, 
+    xp: number,
+    stats: {
+        melee: number;
+        ranged: number;
+        magic: number;
+        defense: number;
+        health: number;
+    }
+  }>('playerLevelUp'),
+
   requestSkillUpgrade: new NetworkEvent<{ playerId: number, skillType: string }>('requestSkillUpgrade'),
   playerDataUpdate: new NetworkEvent<{ ammo : number, hp: number }>('playerDataUpdate'), // (Legacy?)
   playerAmmoUpdate: new NetworkEvent<{ player: Player, ammo : number }>('playerAmmoUpdate'),

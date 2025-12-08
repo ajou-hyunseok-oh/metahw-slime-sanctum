@@ -208,7 +208,18 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
 
     if (leveledUp) {
        // Notify client to show Level Up UI
-       this.sendNetworkBroadcastEvent(Events.playerLevelUp, { player, level, xp: currentXp });
+       this.sendNetworkBroadcastEvent(Events.playerLevelUp, { 
+        player, 
+        level, 
+        xp: currentXp,
+        stats: {
+            melee: state.meleeAttackLevel,
+            ranged: state.rangedAttackLevel,
+            magic: state.magicAttackLevel,
+            defense: state.skillDefenseBonusLevel,
+            health: state.skillHpBonusLevel
+        }
+    });
 
        return this.patchStats(player, {
         level,

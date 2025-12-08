@@ -145,27 +145,14 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
     }
 
     // 이후 실행: 5개 스킬 중 3개 무작위 선택
-    private pickNextCard() {
-        const picks: Array<{ type: string; level: number }> = [];
-        const typePool = [...this.skillTypes];
-    
-        for (let i = 0; i < 3; i++) {
-          if (typePool.length === 0) break;
-          const typeIdx = Math.floor(Math.random() * typePool.length);
-          const type = typePool.splice(typeIdx, 1)[0]; // 유형 중복 방지
-          
-          // 임시로 랜덤 레벨 유지 (추후 MatchState 연동 시 수정 가능)
-          const level = Math.max(
-            1,
-            Math.min(
-              this.maxLevel,
-              Math.floor(Math.random() * this.maxLevel) + 1
-            )
-          );
-          picks.push({ type, level });
-        }
-        
-        this.applyCardBindings(picks);
+    private pickNextCard(currentStats?: {
+        melee: number;
+        ranged: number;
+        magic: number;
+        defense: number;
+        health: number;
+    }) {
+
     }
 
     private applyCardBindings(picks: Array<{ type: string; level: number }>) {
@@ -520,22 +507,14 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
     });
 
     // 레벨업 이벤트 수신 시, 내 주인의 레벨업인지 확인 후 UI 활성화
-    this.connectNetworkEvent(this.world.getLocalPlayer(), Events.playerLevelUp, (data) => {
-        const localPlayer = this.world.getLocalPlayer();
-        const localName = localPlayer ? localPlayer.name.get() : "";
-        
-        console.log(`[LevelUpView] LevelUp Event Received for ${data.player.name.get()} (ID: ${data.player.id}). MyOwner: ${this.ownerPlayerId}`);
-
-        // 내 주인의 ID와 레벨업한 플레이어의 ID가 일치하면 UI 표시
-        // (단, SetOwner가 아직 안 왔거나 ownerPlayerId가 -1이면 무시됨)
-        if (this.ownerPlayerId !== -1 && data.player.id === this.ownerPlayerId) {
-             // 로컬 플레이어 본인인지 재확인 (혹시 모를 중복 방지)
-             if (localPlayer && (localPlayer.id === this.ownerPlayerId || (localName !== "" && localName === data.player.name.get()) || localName === "")) {
-                this.entity.visible.set(true);
-                this.pickNextCard();
-             }
-        }
-    });
+    this.connectNetworkBroadcastEvent(Events.playerLevelUp, (data) => {
+      console.log(`[LevelUpView] LevelUp Event Received for ${data.player.name.get()} (ID: ${data.player.id}). MyOwner: ${this.ownerPlayerId}`);
+      if (this.ownerPlayerId === data.player.id) {
+          this.entity.visible.set(true);
+          this.pickNextCard(data.stats);
+          console.log("[LevelUpView] Showing Level Up UI!");
+      }
+  });
   }
 }
 
