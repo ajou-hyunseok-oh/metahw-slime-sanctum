@@ -2,7 +2,7 @@ import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, PropTypes, Quaternion, Vec3 } from 'horizon/core';
 
 export const PullSize = {
-  Blue: 18,
+  Blue: 50,
   Pink: 9,
   King: 3,
 } as const;

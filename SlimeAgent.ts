@@ -8,6 +8,7 @@ import { ObjectPool } from "ObjectPool";
 import { ISlimeObject, SlimeType } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
 import { EntityHPUpdateEvent } from "HPProgressView";
+import { LootSystem } from "LootSystem";
 
 export enum SlimeState {
   Idle = "Idle", 
@@ -47,6 +48,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     hitMagicVFX: { type: PropTypes.Entity },
     dieVFX: { type: PropTypes.Entity },
     noesisUI: { type: PropTypes.Entity },
+    lootTable: { type: PropTypes.Entity },
   };
 
   public slimeType: SlimeType = SlimeType.Blue;
@@ -279,6 +281,10 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
         }
         if (this.props.dieVFX) {
           this.props.dieVFX.as(ParticleGizmo)?.play();
+        }
+
+        if (this.props.lootTable && LootSystem.instance) {
+          LootSystem.instance.dropLoot(this.props.lootTable, this.entity.position.get(), this.entity.rotation.get());
         }
 
         this.recycleSelf(2000);

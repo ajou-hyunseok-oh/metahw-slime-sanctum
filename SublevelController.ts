@@ -6,7 +6,7 @@
 // Modified by Hyunseok Oh on December 06, 2025 
 
 import { Behaviour, BehaviourFinder } from 'Behaviour';
-import { Component, CodeBlockEvents, Entity, PropTypes, Player, SpawnPointGizmo, TriggerGizmo } from 'horizon/core';
+import { Component, CodeBlockEvents, Entity, PropTypes, Player, SpawnPointGizmo, TriggerGizmo, Asset, Vec3, Quaternion } from 'horizon/core';
 import { SublevelEntity } from 'horizon/world_streaming';
 import { PlayerManager, PlayerMode } from 'PlayerManager';
 import { Events } from 'Events';
@@ -23,12 +23,17 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
     sanctumCutscene: { type: PropTypes.Entity },
     slimeSpawnController: { type: PropTypes.Entity },
     assignedTeam: { type: PropTypes.String, default: 'East' },
+    levelUpView1: { type: PropTypes.Entity },
+    levelUpView2: { type: PropTypes.Entity },
+    levelUpView3: { type: PropTypes.Entity },
+    levelUpView4: { type: PropTypes.Entity },
   };
 
   private coreEntities: Entity[] = [];
   private fixedSpawnEntities: Entity[] = [];
   private spawnEntities: Entity[] = [];
   private slimeSpawnController: SlimeSpawnController | null = null;
+  private playerSlots: Map<number, number> = new Map(); // PlayerID -> Slot Index (0~3)
   
   Awake() {    
     this.connectCodeBlockEvent(this.props.startingZoneTrigger!, CodeBlockEvents.OnPlayerEnterTrigger, this.onPlayerEnterStartingZone.bind(this));
@@ -36,6 +41,7 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
 
   Start() {
     this.slimeSpawnController = BehaviourFinder.GetBehaviour<SlimeSpawnController>(this.props.slimeSpawnController) ?? null;
+    this.playerSlots.clear();
   }
   
   public load(players: Player[]) {
@@ -227,20 +233,45 @@ export class SublevelController extends Behaviour<typeof SublevelController> {
       console.log(`[SublevelController] Match initialized for ${player.name.get()}. HP: ${stats.hpCurrent}/${stats.hpMax}`);
       this.sendNetworkEvent(player, Events.playerAudioRequest, { player: player, soundId: 'Match' });
       
-      // 플레이어의 근접 공격 레벨을 1로 설정 (무기 지급 조건 충족)
-      //MatchStateManager.instance.setCombatAttributes(player, { meleeAttackLevel: 1 });
-      MatchStateManager.instance.setCombatAttributes(player, { rangedAttackLevel: 1 });
-      //MatchStateManager.instance.setCombatAttributes(player, { magicAttackLevel: 1 });
       this.sendNetworkEvent(player, Events.matchPageView, { enabled: true });
 
-      // 1레벨 무기 지급
-      if (WeaponSelector.Instance) {
-        WeaponSelector.Instance.grabWeapon(WeaponType.Ranged, 1, player);
+      // UI 슬롯 할당 및 초기화 (최대 4인)
+      let slotIndex = this.playerSlots.get(player.id);
+      if (slotIndex === undefined) {
+          // 빈 슬롯 찾기 (0~3)
+          const usedSlots = Array.from(this.playerSlots.values());
+          for (let i = 0; i < 4; i++) {
+              if (!usedSlots.includes(i)) {
+                  slotIndex = i;
+                  this.playerSlots.set(player.id, slotIndex);
+                  break;
+              }
+          }
+      }
+
+      if (slotIndex !== undefined) {
+          let uiEntity: Entity | undefined;
+          switch (slotIndex) {
+              case 0: uiEntity = this.props.levelUpView1; break;
+              case 1: uiEntity = this.props.levelUpView2; break;
+              case 2: uiEntity = this.props.levelUpView3; break;
+              case 3: uiEntity = this.props.levelUpView4; break;
+          }
+
+          if (uiEntity) {
+              console.log(`[SublevelController] Assigned LevelUpView_${slotIndex + 1} to player ${player.name.get()} (ID: ${player.id})`);
+              // 해당 UI 엔티티에게 소유자 정보 전송
+              this.sendNetworkEvent(uiEntity, Events.setOwner, { 
+                  playerId: player.id, 
+                  playerName: player.name.get() 
+              });
+          } else {
+              console.warn(`[SublevelController] LevelUpView entity for slot ${slotIndex} is not assigned.`);
+          }
       } else {
-        console.warn('[SublevelController] WeaponSelector instance not found.');
+          console.warn(`[SublevelController] No available UI slots for player ${player.name.get()}`);
       }
     }
-
 
     
     /*

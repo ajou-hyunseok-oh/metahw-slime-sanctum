@@ -55,6 +55,7 @@ export const Events = {
 
   // 레벨업 및 데이터 업데이트
   playerLevelUp: new NetworkEvent<{ player: Player, level: number, xp: number }>('playerLevelUp'),
+  requestSkillUpgrade: new NetworkEvent<{ player: Player, skillType: string }>('requestSkillUpgrade'),
   playerDataUpdate: new NetworkEvent<{ ammo : number, hp: number }>('playerDataUpdate'), // (Legacy?)
   playerAmmoUpdate: new NetworkEvent<{ player: Player, ammo : number }>('playerAmmoUpdate'),
 
@@ -89,14 +90,14 @@ export const Events = {
   lootPickup: new NetworkEvent<{ player: Player, loot: string }>('lootPickup'),
 
   // =================================================================================
-  // UI & Audio
-  // =================================================================================
-  matchPageView: new NetworkEvent<{ enabled: boolean }>('MatchPageViewEvent'),
+    // UI & Audio
+    // =================================================================================
+    setOwner: new NetworkEvent<{ playerId: number, playerName: string }>('SetOwner'),
+    matchPageView: new NetworkEvent<{ enabled: boolean }>('MatchPageViewEvent'),
   lobbyPageView: new NetworkEvent<{ enabled: boolean }>('LobbyPageViewEvent'),
   deathPageView: new NetworkEvent<{ enabled: boolean }>('DeathPageViewEvent'),
   resultPageView: new NetworkEvent<{ enabled: boolean }>('ResultPageViewEvent'),
-  levelUpPageView: new NetworkEvent<{ enabled: boolean }>('LevelUpPageViewEvent'),
-
+  
   loadingProgressUpdate: new NetworkEvent<{ progress: number }>('loadingProgressUpdate'),
   
   // =================================================================================

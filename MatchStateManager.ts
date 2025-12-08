@@ -11,6 +11,7 @@ import { Component, NetworkEvent, Player, PropTypes, Vec3 } from 'horizon/core';
 import { getPlayerStats, PASSIVE_SKILL_DATA } from 'GameBalanceData';
 import { TeamType } from 'GameConstants';
 import { PlayerManager } from 'PlayerManager';
+import { WeaponSelector, WeaponType } from 'WeaponSelector';
 
 export type MatchVariables = {
   hpCurrent: number;
@@ -57,6 +58,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     this.connectNetworkBroadcastEvent(Events.playerHit, this.onPlayerHit.bind(this));
     this.connectNetworkBroadcastEvent(Events.requestMatchExit, this.onRequestMatchExit.bind(this));
     this.connectNetworkBroadcastEvent(Events.requestShowResults, this.onRequestShowResults.bind(this));
+    this.connectNetworkBroadcastEvent(Events.requestSkillUpgrade, this.onRequestSkillUpgrade.bind(this));
   }
 
   /**
@@ -204,6 +206,9 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     }
 
     if (leveledUp) {
+       // Notify client to show Level Up UI
+       this.sendNetworkBroadcastEvent(Events.playerLevelUp, { player, level, xp: currentXp });
+
        return this.patchStats(player, {
         level,
         currentXp,
@@ -217,6 +222,57 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
         currentXp
       });
     }
+  }
+
+  private onRequestSkillUpgrade(data: { player: Player, skillType: string }) {
+    if (!data.player) return;
+    
+    switch (data.skillType) {
+        case "Melee":
+            this.incrementCombatLevel(data.player, 'melee');
+            break;
+        case "Range":
+            this.incrementCombatLevel(data.player, 'ranged');
+            break;
+        case "Magic":
+            this.incrementCombatLevel(data.player, 'magic');
+            break;
+        case "Defense":
+            this.upgradePassiveSkill(data.player, 'defense');
+            break;
+        case "Health":
+            this.upgradePassiveSkill(data.player, 'hp');
+            break;
+    }
+  }
+
+  private incrementCombatLevel(player: Player, type: 'melee' | 'ranged' | 'magic') {
+      const state = this.getOrCreateState(player);
+      const patch: Partial<MatchVariables> = {};
+      let weaponType: WeaponType;
+      let newLevel: number = 0;
+      
+      if (type === 'melee') {
+          newLevel = state.meleeAttackLevel + 1;
+          patch.meleeAttackLevel = newLevel;
+          weaponType = WeaponType.Melee;
+      }
+      else if (type === 'ranged') {
+          newLevel = state.rangedAttackLevel + 1;
+          patch.rangedAttackLevel = newLevel;
+          weaponType = WeaponType.Ranged;
+      }
+      else {
+          newLevel = state.magicAttackLevel + 1;
+          patch.magicAttackLevel = newLevel;
+          weaponType = WeaponType.Magic;
+      }
+      
+      this.patchStats(player, patch);
+
+      if (WeaponSelector.Instance) {
+          WeaponSelector.Instance.grabWeapon(weaponType, newLevel, player);
+      }
   }
 
   public upgradePassiveSkill(player: Player, skillType: 'hp' | 'defense'): MatchVariables {

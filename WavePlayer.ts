@@ -1,7 +1,7 @@
 import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { CodeBlockEvents, Component, Entity, Player, PropTypes, NetworkEvent, AudioGizmo, ParticleGizmo } from 'horizon/core';
 import { SlimeSpawnController } from 'SlimeSpawnController';
-import { WAVE_DATA, WAVE_DURATION_SECONDS, WavePlan, WAVE_CORE_HP } from 'GameBalanceData';
+import { WAVE_DATA, WavePlan, WAVE_CORE_HP } from 'GameBalanceData';
 import { Events } from 'Events';
 import { PlayerPersistentVariables } from 'PlayerPersistentVariables';
 import { PlayerManager, TeamType } from 'PlayerManager';
@@ -30,6 +30,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   private currentWave: number = 1;  
   private currentCoreHP: number = WAVE_CORE_HP;
   private myTeam: TeamType = TeamType.None;
+  private isSpawning: boolean = false;
 
   public Initialize() {
     this.ResetGame();
@@ -48,7 +49,13 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   }
 
   Update(deltaTime: number) {    
-    if (this.currentState === WaveState.CoreTargeting) {
+    if (this.currentState === WaveState.WaveRunning) {
+        // 소환이 끝났고, 모든 슬라임이 처치되었는지 확인
+        const activeCount = this.slimeSpawnController?.getActiveSlimeCount() ?? 0;
+        if (!this.isSpawning && activeCount <= 0) {
+            this.WaveClear();
+        }
+    } else if (this.currentState === WaveState.CoreTargeting) {
         // 모든 슬라임이 처치되었는지 확인
         const activeCount = this.slimeSpawnController?.getActiveSlimeCount() ?? 0;
         if (activeCount <= 0) {
@@ -72,7 +79,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     }
   }
 
-  private StartWave(waveIndex: number) {
+  private async StartWave(waveIndex: number) {
     if (waveIndex > WAVE_DATA.length) {
         console.log("[WavePlayer] All waves completed!");
         this.currentState = WaveState.MatchEnd; 
@@ -91,17 +98,18 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
 
     this.ReportWaveStart(waveIndex);
 
-    // Update 루프 대신 setTimeout으로 정확한 시간에 트리거
+    // Update 루프 대신 setTimeout으로 정확한 시간에 트리거 (데이터 기반 Duration 사용)
     this.async.setTimeout(() => {
         // 웨이브가 바뀌지 않았고, 여전히 진행 중일 때만 실행
         if (this.currentWave === waveIndex && this.currentState === WaveState.WaveRunning) {
             this.StartCoreTargeting();
         }
-    }, WAVE_DURATION_SECONDS * 1000);
+    }, waveData.duration * 1000);
 
     // 몬스터 소환
-    const spawnCount = 8 + Math.floor(waveIndex * 0.5);
-    this.slimeSpawnController?.spawnWave(waveData, spawnCount);
+    this.isSpawning = true;
+    await this.slimeSpawnController?.spawnWave(waveData, waveData.spawnCount);
+    this.isSpawning = false;
   }
 
   private StartCoreTargeting() {

@@ -5,37 +5,17 @@
 //
 // Modified by Hyunseok Oh on December 07, 2025
 
-import { CodeBlockEvents, Component, NetworkEvent, Player } from 'horizon/core';
+import { CodeBlockEvents, Component, NetworkEvent, Player, PropTypes } from 'horizon/core';
 import { NoesisGizmo } from 'horizon/noesis';
 import { Events } from 'Events';
-
-/*
-const playerModeChangedEvent = (Events as unknown as {
-  playerModeChanged: NetworkEvent<{ mode: string }>;
-}).playerModeChanged;
-
-const matchStateRequestEvent = (Events as unknown as {
-  matchStateRequest: NetworkEvent<{ playerId: number }>;
-}).matchStateRequest;
-
-const matchStateUpdateEvent = (Events as unknown as {
-  matchStateUpdate: NetworkEvent<MatchStateUpdatePayload>;
-}).matchStateUpdate;
-
-const playerHPUpdateEvent = (Events as unknown as {
-  playerHPUpdate: NetworkEvent<{ current: number, max: number }>;
-}).playerHPUpdate;
-
-const requestMatchExitEvent = (Events as unknown as {
-  requestMatchExit: NetworkEvent<{ playerId: number }>;
-}).requestMatchExit;
-*/
 
 /**
  * This is an example of a NoesisUI component that can be used in a world.
  * It's default execution mode is "Shared" which means it will be executed on the server and all of the clients.
  */
 class MatchPageView extends Component<typeof MatchPageView> {
+  static propsDefinition = {};
+
   start() {
     if (this.world.getLocalPlayer().id === this.world.getServerPlayer().id) {
       this.startServer();
