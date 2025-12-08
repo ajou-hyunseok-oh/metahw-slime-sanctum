@@ -196,7 +196,16 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
    // 실제 스킬 적용 로직 (필요시 외부 시스템과 연동)
    private applySkill(choice: { type: string; level: number } | undefined) {
      if (!choice) return;
-     // 실제 스킬 반영 로직을 연결하는 지점
+
+     if (this.ownerPlayerId !== -1) {
+         this.sendNetworkBroadcastEvent(Events.requestSkillUpgrade, { 
+             playerId: this.ownerPlayerId, 
+             skillType: choice.type 
+         });
+         console.log(`[LevelUpView] Request Skill Upgrade: ${choice.type} (OwnerID: ${this.ownerPlayerId})`);
+     } else {
+         console.error("[LevelUpView] Cannot apply skill: Owner ID is not set!");
+     }
    }
  
   // 오버레이/커스텀 UI 닫기 (정적 할당 방식이므로 삭제 대신 숨김 처리)

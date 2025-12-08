@@ -55,7 +55,7 @@ export const Events = {
 
   // 레벨업 및 데이터 업데이트
   playerLevelUp: new NetworkEvent<{ player: Player, level: number, xp: number }>('playerLevelUp'),
-  requestSkillUpgrade: new NetworkEvent<{ player: Player, skillType: string }>('requestSkillUpgrade'),
+  requestSkillUpgrade: new NetworkEvent<{ playerId: number, skillType: string }>('requestSkillUpgrade'),
   playerDataUpdate: new NetworkEvent<{ ammo : number, hp: number }>('playerDataUpdate'), // (Legacy?)
   playerAmmoUpdate: new NetworkEvent<{ player: Player, ammo : number }>('playerAmmoUpdate'),
 

@@ -65,6 +65,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
    * 플레이어가 매치에 진입했을 때 호출하여 기본 상태를 초기화한다.
    */
   public enterMatch(player: Player, overrides?: Partial<MatchVariables>): MatchVariables {
+    console.log(`[MatchStateManager] enterMatch called for Player: ${player.name.get()} (ID: ${player.id})`);
     const state = this.createInitialState(overrides);
     this.playerStates.set(player.id, state);
     this.emitStateUpdate(player, state);
@@ -224,24 +225,32 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     }
   }
 
-  private onRequestSkillUpgrade(data: { player: Player, skillType: string }) {
-    if (!data.player) return;
+  private onRequestSkillUpgrade(data: { playerId: number, skillType: string }) {
+    const player = this.world.getPlayers().find((p) => p.id === data.playerId);
     
+    if (!player) {
+        const allIds = this.world.getPlayers().map(p => `${p.name.get()}(${p.id})`).join(', ');
+        console.error(`[MatchStateManager] Player ID ${data.playerId} not found in player list. Current players: [${allIds}]`);
+        return;
+    }
+    
+    console.log(`[MatchStateManager] RequestSkillUpgrade received. PlayerID: ${data.playerId}, Skill: ${data.skillType}, FoundPlayer: ${player.name.get()}`);
+
     switch (data.skillType) {
         case "Melee":
-            this.incrementCombatLevel(data.player, 'melee');
+            this.incrementCombatLevel(player, 'melee');
             break;
         case "Range":
-            this.incrementCombatLevel(data.player, 'ranged');
+            this.incrementCombatLevel(player, 'ranged');
             break;
         case "Magic":
-            this.incrementCombatLevel(data.player, 'magic');
+            this.incrementCombatLevel(player, 'magic');
             break;
         case "Defense":
-            this.upgradePassiveSkill(data.player, 'defense');
+            this.upgradePassiveSkill(player, 'defense');
             break;
         case "Health":
-            this.upgradePassiveSkill(data.player, 'hp');
+            this.upgradePassiveSkill(player, 'hp');
             break;
     }
   }
@@ -384,6 +393,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
       playerId: player.id,
       ...state,
     };
+    console.log(`[MatchStateManager] Sending StateUpdate to Player ${player.id} (${player.name.get()}). Melee: ${state.meleeAttackLevel}, Ranged: ${state.rangedAttackLevel}, Magic: ${state.magicAttackLevel}, Def: ${state.defense}`);
     this.sendNetworkEvent(player, Events.matchStateUpdate, payload);
   }
 
