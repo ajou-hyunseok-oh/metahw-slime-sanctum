@@ -32,6 +32,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   private currentCoreHP: number = WAVE_CORE_HP;
   private myTeam: TeamType = TeamType.None;
   private isSpawning: boolean = false;
+  private coreDestroyHandled: boolean = false;
 
   public Initialize() {
     this.ResetGame();
@@ -47,22 +48,6 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   start() {
     this.slimeSpawnController = BehaviourFinder.GetBehaviour<SlimeSpawnController>(this.props.slimeSpawner) ?? null;
     this.ppv = new PlayerPersistentVariables(this.world);
-  }
-
-  Update(deltaTime: number) {    
-    if (this.currentState === WaveState.WaveRunning) {
-        // 소환이 끝났고, 모든 슬라임이 처치되었는지 확인
-        const activeCount = this.slimeSpawnController?.getActiveSlimeCount() ?? 0;
-        if (!this.isSpawning && activeCount <= 0) {
-            this.WaveClear();
-        }
-    } else if (this.currentState === WaveState.CoreTargeting) {
-        // 모든 슬라임이 처치되었는지 확인
-        const activeCount = this.slimeSpawnController?.getActiveSlimeCount() ?? 0;
-        if (activeCount <= 0) {
-            this.WaveClear();
-        }
-    }
   }
 
   private ReportWaveStart(waveIndex: number) {
@@ -100,22 +85,29 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
         return;
     }    
 
-    this.currentState = WaveState.WaveRunning;    
-
+    this.currentState = WaveState.WaveRunning;
     this.ReportWaveStart(waveIndex);
 
-    // Update 루프 대신 setTimeout으로 정확한 시간에 트리거 (데이터 기반 Duration 사용)
+    // Update 루프 대신 setTimeout으로 정확한 시간에 트리거 (데이터 기반 coreTime 사용)
     this.async.setTimeout(() => {
         // 웨이브가 바뀌지 않았고, 여전히 진행 중일 때만 실행
         if (this.currentWave === waveIndex && this.currentState === WaveState.WaveRunning) {
             this.StartCoreTargeting();
         }
-    }, waveData.duration * 1000);
+    }, waveData.coreTime * 1000);
 
     // 몬스터 소환
     this.isSpawning = true;
-    await this.slimeSpawnController?.spawnWave(waveData, waveData.spawnCount);
+    await this.slimeSpawnController?.spawnWave(waveData);
     this.isSpawning = false;
+
+    // 모든 몹 소환이 끝난 시점부터 intervalSeconds 후에 웨이브 종료 처리
+    this.async.setTimeout(() => {
+        // 아직 같은 웨이브이고, 매치가 끝나지 않은 경우에만 종료
+        if (this.currentWave === waveIndex && this.currentState !== WaveState.MatchEnd) {
+            this.WaveClear();
+        }
+    }, waveData.intervalSeconds * 1000);
   }
 
   private StartCoreTargeting() {
@@ -185,6 +177,9 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
   }
 
   private OnCoreDestroyed() {
+    if (this.coreDestroyHandled) return;
+    this.coreDestroyHandled = true;
+
     console.log("[WavePlayer] Core destroyed! Game Over.");
     this.currentState = WaveState.MatchEnd;
     
@@ -199,10 +194,13 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     // Kill all slimes
     this.slimeSpawnController?.killAllSlimes();
 
-    // MatchStateManager를 통해 패배 처리 (결과창 표시 포함)
-    if (MatchStateManager.instance) {
-        MatchStateManager.instance.notifyTeamDefeat(this.myTeam);
-    }
+    // 폭발 연출 이후 3초 뒤에 패배 처리 (영상 촬영용 딜레이)
+    this.async.setTimeout(() => {        
+        // MatchStateManager를 통해 패배 처리 (결과창 표시 포함)
+        if (MatchStateManager.instance) {
+            MatchStateManager.instance.notifyTeamDefeat(this.myTeam);
+        }
+    }, 3000);
 
     // Reset Game after delay? or Wait for user input in DeathPage
     // For now, let's just show the death page.
@@ -212,6 +210,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     this.currentState = WaveState.Ready;
     this.currentCoreHP = WAVE_CORE_HP;
     this.currentWave = 1;
+    this.coreDestroyHandled = false;
 
     const coreNoesisUIEntity = this.props.coreNoesisUIEntity;
     if (coreNoesisUIEntity) {

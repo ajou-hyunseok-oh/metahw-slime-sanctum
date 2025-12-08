@@ -109,6 +109,7 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
       return;
     }
 
+    const playerId = player.id;
     // 플레이어 이동 고정
     this.setPlayerMovement(player, false);
 
@@ -118,7 +119,6 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
         return;
       }
 
-      const playerId = player.id;
       const requestId = this.nextRequestId(playerId);
 
       await this.despawnCurrentWeapon(playerId);

@@ -2,9 +2,9 @@ import { Behaviour, BehaviourFinder } from 'Behaviour';
 import { Component, Entity, PropTypes, Quaternion, Vec3 } from 'horizon/core';
 
 export const PullSize = {
-  Blue: 50,
-  Pink: 9,
-  King: 3,
+  Blue: 70,
+  Pink: 12,
+  King: 6,
 } as const;
 
 export enum SlimeType {
@@ -13,8 +13,14 @@ export enum SlimeType {
   King
 }
 
+export type WaveBuff = {
+  modelScaling?: number;
+  damageScaling?: number;
+  healthScaling?: number;
+};
+
 export interface ISlimeObject {
-  onAllocate(position: Vec3, rotation: Quaternion): void;
+  onAllocate(position: Vec3, rotation: Quaternion, waveBuff?: WaveBuff): void;
   onFree(): void;
   slimeType: SlimeType;
 }
@@ -47,16 +53,16 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
     this.pools.set(SlimeType.King, new PoolState(PullSize.King, this.props.kingAsset));
   }
 
-  public spawn(type: SlimeType, position: Vec3, rotation: Quaternion) {
+  public spawn(type: SlimeType, position: Vec3, rotation: Quaternion, waveBuffer?: WaveBuff) {
     const pool = this.pools.get(type);
     if (!pool) {
       console.error(`[SlimeObjectPool] Unknown SlimeType: ${type}`);
       return;
-    }
+    }    
 
     // 1. 여유 공간이 있는 경우 (생성 중인 것 포함) -> 신규 생성
     if (pool.totalCount < pool.limit) {
-      this.createNewEntity(pool, type, position, rotation);
+      this.createNewEntity(pool, type, position, rotation, waveBuffer);
       return;
     }
 
@@ -64,7 +70,7 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
     // 2-1. 대기 중(Free)인 엔티티가 있으면 우선 사용
     if (pool.freeEntities.size > 0) {
       const entity = pool.freeEntities.values().next().value;
-      this.reuseEntity(pool, entity, position, rotation);
+      this.reuseEntity(pool, entity, position, rotation, waveBuffer);
       return;
     }
 
@@ -82,7 +88,7 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
         pool.allocatedEntities.delete(entity);
         pool.allocatedEntities.add(entity);
         
-        slimeObject.onAllocate(position, rotation);
+        slimeObject.onAllocate(position, rotation, waveBuffer);
       }
       return;
     }
@@ -92,7 +98,7 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
     console.warn(`[SlimeObjectPool] All entities are pending creation for type ${type}. Skipping spawn.`);
   }
 
-  private createNewEntity(pool: PoolState, type: SlimeType, position: Vec3, rotation: Quaternion) {
+  private createNewEntity(pool: PoolState, type: SlimeType, position: Vec3, rotation: Quaternion, waveBuffer?: WaveBuff) {
     if (!pool.asset) {
       console.warn(`[SlimeObjectPool] Asset not assigned for type ${type}`);
       return;
@@ -108,7 +114,7 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
       
       const slimeObject = this.getSlimeObject(entity);
       if (slimeObject) {
-        slimeObject.onAllocate(position, rotation);
+        slimeObject.onAllocate(position, rotation, waveBuffer);
       } else {
         console.error(`[SlimeObjectPool] Spawned entity does not have ISlimeObject implementation.`);
       }
@@ -118,14 +124,14 @@ export class SlimeObjectPool extends Behaviour<typeof SlimeObjectPool> {
     });
   }
 
-  private reuseEntity(pool: PoolState, entity: Entity, position: Vec3, rotation: Quaternion) {
+  private reuseEntity(pool: PoolState, entity: Entity, position: Vec3, rotation: Quaternion, waveBuffer?: WaveBuff) {
     // Free 상태에서 Allocated 상태로 전환
     pool.freeEntities.delete(entity);
     pool.allocatedEntities.add(entity);
 
     const slimeObject = this.getSlimeObject(entity);
     if (slimeObject) {
-      slimeObject.onAllocate(position, rotation);
+      slimeObject.onAllocate(position, rotation, waveBuffer);
     }
   }
 

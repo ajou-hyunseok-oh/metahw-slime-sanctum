@@ -12,7 +12,7 @@ import { Color, Component, Player, PropTypes, Quaternion, Vec3, Entity, AudioGiz
 import { INavMesh, NavMeshAgent } from "horizon/navmesh";
 import { SLIME_BASE_STATS, SlimeStats, WeaponType } from "GameBalanceData";
 import { ObjectPool } from "ObjectPool";
-import { ISlimeObject, SlimeType } from "SlimeObjectPool";
+import { ISlimeObject, SlimeType, WaveBuff } from "SlimeObjectPool";
 import { MatchStateManager } from "MatchStateManager";
 import { EntityHPUpdateEvent } from "HPProgressView";
 import { LootItemSpawner } from "LootItemSpawner";
@@ -89,6 +89,19 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
   private readonly attackScaleExpand: Vec3 = new Vec3(1.2, 0.8, 1.2);
   private readonly attackScaleCompress: Vec3 = new Vec3(0.9, 1.2, 0.9);
 
+  // 웨이브 버프 배수 (기본 1)
+  private waveModelScale: number = 1;
+  private waveDamageMultiplier: number = 1;
+  private waveHealthMultiplier: number = 1;
+
+  private scaleWithMultiplier(vec: Vec3): Vec3 {
+    return new Vec3(
+      vec.x * this.waveModelScale,
+      vec.y * this.waveModelScale,
+      vec.z * this.waveModelScale,
+    );
+  }
+
   protected hitPoints: number = 1;
   protected maxHitPoints: number = 1;
   private hpSubscribers: Set<(snapshot: SlimeHealthSnapshot) => void> = new Set();
@@ -160,11 +173,16 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.moveEntityToPoolRestingState();
   }
 
-  public onAllocate(position: Vec3, rotation: Quaternion, owner?: Player | null) {
+  public onAllocate(position: Vec3, rotation: Quaternion, waveBuff?: WaveBuff, owner?: Player | null) {
     if (this.pendingRecycleHandle !== null) {
       this.async.clearTimeout(this.pendingRecycleHandle);
       this.pendingRecycleHandle = null;
     }
+
+    // 웨이브 버프 적용
+    this.waveModelScale = waveBuff?.modelScaling ?? 1;
+    this.waveDamageMultiplier = waveBuff?.damageScaling ?? 1;
+    this.waveHealthMultiplier = waveBuff?.healthScaling ?? 1;
 
     this.entity.position.set(position);
     this.entity.rotation.set(rotation);
@@ -217,6 +235,9 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.currentState = null; // 상태 초기화
     this.stopIdleScaleAnimation(true);
     this.stopAttackScaleAnimation(true);
+    this.waveModelScale = 1;
+    this.waveDamageMultiplier = 1;
+    this.waveHealthMultiplier = 1;
   }
 
   protected setModelVisibility(visible: boolean) {
@@ -422,7 +443,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     // 공격력 랜덤 산출
     const minDmg = this.config.minAttackDamage ?? 1;
     const maxDmg = this.config.maxAttackDamage ?? 1;
-    const damage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+    const baseDamage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+    const damage = Math.max(1, Math.ceil(baseDamage * this.waveDamageMultiplier));
 
     // 플레이어에게 피격 이벤트 전송
     this.sendNetworkBroadcastEvent(Events.playerHit, {
@@ -485,7 +507,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     
     const minDmg = this.config.minAttackDamage ?? 1;
     const maxDmg = this.config.maxAttackDamage ?? 1;
-    const damage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+    const baseDamage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
+    const damage = Math.max(1, Math.ceil(baseDamage * this.waveDamageMultiplier));
 
     this.sendNetworkBroadcastEvent(Events.coreHit, { damage: damage });
     
@@ -554,7 +577,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.idleScaleActive = false;
     if (resetToDefault) {
       const modelEntity = this.props.model ?? this.entity;
-      modelEntity.scale.set(this.idleScaleNormal);
+      modelEntity.scale.set(this.scaleWithMultiplier(this.idleScaleNormal));
     }
   }
 
@@ -578,7 +601,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     const progress = this.idleScaleProgress;
     const currentScale = this.calculateIdleScale(progress);
 
-    modelEntity.scale.set(currentScale);
+    modelEntity.scale.set(this.scaleWithMultiplier(currentScale));
   }
 
   private calculateIdleScale(progress: number): Vec3 {
@@ -593,7 +616,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
   private applyIdleScale(progress: number) {
     const modelEntity = this.props.model ?? this.entity;
     if (!modelEntity) return;
-    modelEntity.scale.set(this.calculateIdleScale(progress));
+    modelEntity.scale.set(this.scaleWithMultiplier(this.calculateIdleScale(progress)));
   }
 
   private startAttackScaleAnimation() {
@@ -607,7 +630,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
     this.attackScaleActive = false;
     if (resetToDefault) {
       const modelEntity = this.props.model ?? this.entity;
-      modelEntity.scale.set(this.idleScaleNormal);
+      modelEntity.scale.set(this.scaleWithMultiplier(this.idleScaleNormal));
     }
   }
 
@@ -625,7 +648,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
     const progress = this.attackScaleElapsed / this.attackScaleDuration;
     const currentScale = this.calculateAttackScale(progress);
-    modelEntity.scale.set(currentScale);
+    modelEntity.scale.set(this.scaleWithMultiplier(currentScale));
   }
 
   private calculateAttackScale(progress: number): Vec3 {
@@ -644,7 +667,7 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
   private applyAttackScale(progress: number) {
     const modelEntity = this.props.model ?? this.entity;
     if (!modelEntity) return;
-    modelEntity.scale.set(this.calculateAttackScale(progress));
+    modelEntity.scale.set(this.scaleWithMultiplier(this.calculateAttackScale(progress)));
   }
   
   private lerpVec3(start: Vec3, end: Vec3, t: number): Vec3 {
@@ -801,7 +824,8 @@ export class SlimeAgent extends Behaviour<typeof SlimeAgent> implements ISlimeOb
 
   private rollSpawnHitPoints(): number {
     const minHpConfig = typeof this.config?.minHp === "number" ? this.config.minHp : 1;
-    return Math.max(1, minHpConfig);
+    const baseHp = Math.max(1, minHpConfig);
+    return Math.max(1, Math.ceil(baseHp * this.waveHealthMultiplier));
   }
 
   private updateNavigationMovement() {

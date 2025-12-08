@@ -28,28 +28,28 @@ export class LootItemSpawner extends Behaviour<typeof LootItemSpawner> {
   /** 슬라임 타입별 드롭 테이블 (가중치 합산 방식) */
   private readonly dropTables: Record<SlimeType, { type: ItemType | null; weight: number }[]> = {
     [SlimeType.Blue]: [
-      { type: ItemType.Coin, weight: 20 },
-      { type: ItemType.Gem, weight: 20 },
-      { type: ItemType.HealthPotion, weight: 20 },
-      { type: ItemType.DefenceUpPotion, weight: 20 },
-      { type: ItemType.AttackSpeedUpPotion, weight: 20 },
+      { type: ItemType.Coin, weight: 90 },
+      { type: ItemType.Gem, weight: 0 },
+      { type: ItemType.HealthPotion, weight: 10 },
+      { type: ItemType.DefenceUpPotion, weight: 0 },
+      { type: ItemType.AttackSpeedUpPotion, weight: 0 },
       { type: null, weight: 0 }, // 드롭 없음
     ],
     [SlimeType.Pink]: [
-      { type: ItemType.Coin, weight: 40 },
-      { type: ItemType.Gem, weight: 15 },
-      { type: ItemType.HealthPotion, weight: 20 },
-      { type: ItemType.DefenceUpPotion, weight: 12 },
-      { type: ItemType.AttackSpeedUpPotion, weight: 8 },
-      { type: null, weight: 20 },
+      { type: ItemType.Coin, weight: 50 },
+      { type: ItemType.Gem, weight: 10 },
+      { type: ItemType.HealthPotion, weight: 30 },
+      { type: ItemType.DefenceUpPotion, weight: 5 },
+      { type: ItemType.AttackSpeedUpPotion, weight: 5 },
+      { type: null, weight: 0 },
     ],
     [SlimeType.King]: [
-      { type: ItemType.Coin, weight: 30 },
-      { type: ItemType.Gem, weight: 25 },
+      { type: ItemType.Coin, weight: 0 },
+      { type: ItemType.Gem, weight: 50 },
       { type: ItemType.HealthPotion, weight: 20 },
-      { type: ItemType.DefenceUpPotion, weight: 12 },
-      { type: ItemType.AttackSpeedUpPotion, weight: 13 },
-      { type: null, weight: 10 },
+      { type: ItemType.DefenceUpPotion, weight: 15 },
+      { type: ItemType.AttackSpeedUpPotion, weight: 15 },
+      { type: null, weight: 0 },
     ],
   };
 

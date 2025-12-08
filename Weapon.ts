@@ -16,8 +16,11 @@ export class Weapon extends WeaponBase {
   static override propsDefinition = {
     ...WeaponBase.propsDefinition,
     weaponType: { type: hz.PropTypes.String, default: 'Melee' },
-    fireSFX: { type: hz.PropTypes.Entity },
-    muzzleFlash: { type: hz.PropTypes.Entity },
+    fireSFX1: { type: hz.PropTypes.Entity, default: undefined },
+    fireSFX2: { type: hz.PropTypes.Entity, default: undefined },
+    fireSFX3: { type: hz.PropTypes.Entity, default: undefined },
+    fireSFX4: { type: hz.PropTypes.Entity, default: undefined },
+    fireVFX: { type: hz.PropTypes.Entity, default: undefined },
   };
 
   private get weaponType(): WeaponType {
@@ -77,16 +80,41 @@ export class Weapon extends WeaponBase {
     });
   }
 
+  private fireSfxCycleIndex = 0;
+
   private playEffects() {
-    const fireSFX = (this.props as any).fireSFX as hz.Entity;
-    if (fireSFX) {
-      fireSFX.as(AudioGizmo)?.play();
+    const fireSfxEntities = this.getAvailableFireSfx();
+    if (fireSfxEntities.length > 0) {
+      const sfxToPlay = fireSfxEntities[this.fireSfxCycleIndex % fireSfxEntities.length];
+      sfxToPlay.as(AudioGizmo)?.play();
+      this.fireSfxCycleIndex = (this.fireSfxCycleIndex + 1) % fireSfxEntities.length;
     }
 
     const muzzleFlash = (this.props as any).muzzleFlash as hz.Entity;
     if (muzzleFlash) {
       muzzleFlash.as(ParticleGizmo)?.play();
     }
+
+    const fireVFX = (this.props as any).fireVFX as hz.Entity;
+    if (fireVFX) {
+      fireVFX.as(ParticleGizmo)?.play();
+    }
+  }
+
+  /**
+   * fireSFX1~4 혹은 기존 fireSFX 필드 중 설정된 사운드만 반환
+   * 순환 재생을 위해 순서 유지
+   */
+  private getAvailableFireSfx(): hz.Entity[] {
+    const props = this.props as any;
+    const sfxList: (hz.Entity | undefined)[] = [
+      props.fireSFX1,
+      props.fireSFX2,
+      props.fireSFX3,
+      props.fireSFX4,      
+    ];
+
+    return sfxList.filter((sfx): sfx is hz.Entity => !!sfx);
   }
 
   private cachedEntityId?: string;

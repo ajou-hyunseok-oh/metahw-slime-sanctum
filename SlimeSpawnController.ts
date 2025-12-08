@@ -24,6 +24,8 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
   
   Start() {
     this.slimeObjectPool = BehaviourFinder.GetBehaviour<SlimeObjectPool>(this.props.slimeObjectPool) ?? null;    
+
+    console.log(`[SlimeSpawnController] waveSpawnEntities: ${this.waveSpawnEntities.length}`);
   }
 
   public async spawnSanctum(fixedSpawnEntities: Entity[], waveSpawnEntities: Entity[], coreEntities: Entity, players: Player[], startProgress: number) {    
@@ -31,33 +33,45 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
     this.coreEntity = coreEntities;
     this.fixedSpawnEntities = fixedSpawnEntities;
     this.waveSpawnEntities = waveSpawnEntities;    
-    
-    // 전체 80%를 전체 블루 슬라임 수로 나누어 균등하게 할당
-    const progressStep = 80 / PullSize.Blue;
-
-    const nextProgress = await this.spawnFixedSlimes(players, startProgress, progressStep);
-    
+        
+    const progressStep = 80 / this.fixedSpawnEntities.length * 3; // 3 is the number of blue slimes per fixed spawn entity
+    await this.spawnFixedSlimes(players, startProgress, progressStep);    
   }
 
-  public async spawnWave(wavePlan: WavePlan, count: number) {
+  public async spawnWave(wavePlan: WavePlan) {
     if (this.waveSpawnEntities.length === 0) return;
+    const waveBuffer = {
+      modelScaling: wavePlan.modelScaling ?? 1,
+      damageScaling: wavePlan.damageScaling ?? 1,
+      healthScaling: wavePlan.healthScaling ?? 1,
+    };
 
-    // 웨이브별 몬스터 구성 확률 적용
-    // count만큼 소환하되, waveSpawnEntities 위치를 순회하며 소환
-    // 한 번에 너무 많이 소환하면 부하가 걸릴 수 있으므로 약간의 텀을 줄 수도 있음.
-    // 여기서는 일단 단순하게 순차 소환 (필요시 async delay 추가)
-
-    for (let i = 0; i < count; i++) {
-        const spawnPoint = this.waveSpawnEntities[i % this.waveSpawnEntities.length];
-        const type = this.determineSlimeType(wavePlan);
-        
-        this.slimeObjectPool?.spawn(type, spawnPoint.position.get(), spawnPoint.rotation.get());
-        
-        // 약간의 간격을 두고 소환하여 겹침 방지 및 부하 분산
-        if (i % 5 === 0) {
-            await new Promise(resolve => this.async.setTimeout(resolve, 50));
+    for (let i = 0; i < wavePlan.turn; i++) {
+      // 블루 슬라임은 count 만큼 소환 이후 더이상 소환하지 않는다.    
+      for (let j = 0; j < this.waveSpawnEntities.length; j++) {
+        if (Math.random() < wavePlan.pinkChance) {
+          const spawnPos = this.getRandomSpawnPosition(this.waveSpawnEntities[j].position.get());
+          this.slimeObjectPool?.spawn(SlimeType.Pink, spawnPos, this.waveSpawnEntities[j].rotation.get(), waveBuffer);
+          await new Promise(resolve => this.async.setTimeout(resolve, 500));
         }
-    }
+
+        for (let i = 0; i < 6; i++) {          
+          const spawnPos = this.getRandomSpawnPosition(this.waveSpawnEntities[j].position.get());
+          this.slimeObjectPool?.spawn(SlimeType.Blue, spawnPos, this.waveSpawnEntities[j].rotation.get(), waveBuffer);
+          await new Promise(resolve => this.async.setTimeout(resolve, 500));
+        }              
+
+        if (Math.random() < wavePlan.kingChance) {
+          const spawnPos = this.getRandomSpawnPosition(this.waveSpawnEntities[j].position.get());
+          this.slimeObjectPool?.spawn(SlimeType.King, spawnPos, this.waveSpawnEntities[j].rotation.get(), waveBuffer);
+          await new Promise(resolve => this.async.setTimeout(resolve, 500));
+        }
+
+        await new Promise(resolve => this.async.setTimeout(resolve, 3000));
+      }
+
+      await new Promise(resolve => this.async.setTimeout(resolve, 5000));
+    }    
   }
 
   public targetCore() {
@@ -85,23 +99,13 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
     });
   }
 
-  private determineSlimeType(plan: WavePlan): SlimeType {
-    const rand = Math.random();
-    if (rand < plan.kingChance) {
-        return SlimeType.King;
-    } else if (rand < plan.kingChance + plan.pinkChance) {
-        return SlimeType.Pink;
-    } else {
-        return SlimeType.Blue;
-    }
-  }
-
   private async spawnFixedSlimes(players: Player[], startProgress: number, step: number): Promise<number> {
     let currentProgress = startProgress;
 
     for (const entity of this.fixedSpawnEntities) {
       for (let i = 0; i < 3; i++) {
-        this.slimeObjectPool?.spawn(SlimeType.Blue, entity.position.get(), entity.rotation.get());
+        const spawnPos = this.getRandomSpawnPosition(entity.position.get());
+        this.slimeObjectPool?.spawn(SlimeType.Blue, spawnPos, entity.rotation.get());
         
         // Update progress
         currentProgress += step;
@@ -114,6 +118,17 @@ export class SlimeSpawnController extends Behaviour<typeof SlimeSpawnController>
       }
     }
     return currentProgress;
+  }
+
+  private getRandomSpawnPosition(origin: Vec3): Vec3 {
+    const radius = 1.0; // 스폰 반경
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * radius;
+    return new Vec3(
+        origin.x + Math.cos(angle) * distance, 
+        origin.y, 
+        origin.z + Math.sin(angle) * distance
+    );
   }
 }
 Component.register(SlimeSpawnController);
