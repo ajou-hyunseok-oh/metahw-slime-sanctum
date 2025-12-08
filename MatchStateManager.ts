@@ -7,7 +7,7 @@
 
 import { Behaviour } from 'Behaviour';
 import { Events } from 'Events';
-import { Component, NetworkEvent, Player, PropTypes, Vec3 } from 'horizon/core';
+import { AvatarPoseGizmo, Component, NetworkEvent, Player, PropTypes, Vec3 } from 'horizon/core';
 import { getPlayerStats, PASSIVE_SKILL_DATA } from 'GameBalanceData';
 import { TeamType } from 'GameConstants';
 import { PlayerManager } from 'PlayerManager';
@@ -436,7 +436,7 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
     console.log(`[MatchStateManager] Player ${player.name.get()} Hit! Raw: ${rawDamage}, Def: ${state.defense}, Final: ${damage}. HP: ${state.hpCurrent}/${state.hpMax}`);
 
     if (state.hpCurrent <= 0) {
-       console.log(`[MatchStateManager] Player ${player.name.get()} died.`);
+       console.log(`[MatchStateManager] Player ${player.name.get()} died.`);       
        this.notifyPlayerDeath(player);
     }
   }
@@ -463,7 +463,10 @@ export class MatchStateManager extends Behaviour<typeof MatchStateManager> {
   }
 
   private notifyPlayerDeath(player: Player) {
-      this.sendNetworkEvent(player, Events.playerDied, { playerId: player.id });
+      console.log(`[MatchStateManager] Player ${player.name.get()} died.`);
+      this.sendNetworkBroadcastEvent(Events.playerDied, { playerId: player.id });
+      this.sendNetworkEvent(player, Events.matchPageView, { enabled: false });
+      this.sendNetworkEvent(player, Events.resultPageView, { enabled: true });
   }
 
   private sendResults(player: Player, state: MatchVariables) {

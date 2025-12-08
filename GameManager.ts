@@ -36,10 +36,19 @@ class GameManager extends Behaviour<typeof GameManager> {
   }
 
   private onPlayerDied(data: { playerId: number }) {
+    console.log(`[GameManager] Local Player Died. Showing Death Page. ${data.playerId}`);
     const localPlayer = this.world.getLocalPlayer();
     if (localPlayer && localPlayer.id === data.playerId) {
       // 사망 시 햅틱 재생
       HapticFeedback.playPattern(localPlayer, HapticType.death, HapticHand.Both, this);
+
+      // 사망 화면 표시
+      this.sendNetworkEvent(localPlayer, Events.deathPageView, { enabled: true });
+      
+      // 전투 HUD 숨기기
+      this.sendNetworkEvent(localPlayer, Events.matchPageView, { enabled: false });
+
+      console.log(`[GameManager] Local Player Died. Showing Death Page.`);
     }
   }
 

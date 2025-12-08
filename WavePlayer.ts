@@ -190,7 +190,7 @@ export class WavePlayer extends Behaviour<typeof WavePlayer> {
     // Show Death Page to All Players in Team
     const players = PlayerManager.instance.getTeamPlayers(this.myTeam);
     players.forEach(p => {
-        this.sendNetworkEvent(p, Events.deathPageView, { enabled: true });
+        this.sendNetworkEvent(p, Events.resultPageView, { enabled: true });
         this.sendNetworkEvent(p, Events.matchPageView, { enabled: false }); // Hide HUD
     });
 

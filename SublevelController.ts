@@ -14,7 +14,6 @@ import { LoadingPageViewEvent } from 'LoadingPageView';
 import { SlimeSpawnController } from 'SlimeSpawnController';
 import { MatchStateManager } from 'MatchStateManager';
 import { TeamType } from 'GameConstants';
-import { WeaponSelector, WeaponType } from 'WeaponSelector';
 
 export class SublevelController extends Behaviour<typeof SublevelController> {
   static propsDefinition = {

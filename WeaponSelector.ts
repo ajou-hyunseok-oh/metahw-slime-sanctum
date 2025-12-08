@@ -75,7 +75,7 @@ export class WeaponSelector extends Behaviour<typeof WeaponSelector> {
 
   private readonly DEFAULT_LOCOMOTION_SPEED = 4.5;
   private readonly DEFAULT_JUMP_SPEED = 4.3;
-  private readonly WEAPON_SWAP_LOCK_MS = 1500;
+  private readonly WEAPON_SWAP_LOCK_MS = 1000;
 
   private setPlayerMovement(player: Player, enabled: boolean) {
     if (!player) return;
