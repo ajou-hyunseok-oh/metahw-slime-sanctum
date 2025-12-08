@@ -43,6 +43,7 @@ export class LootItem extends Behaviour<typeof LootItem> {
   private sfxCollect?: AudioGizmo;
   private owningSpawner?: LootItemSpawner;
   private isActive: boolean = false;
+  private recycleTimer?: number;
 
   private static attackBuffTimers: Map<number, number> = new Map();
 
@@ -100,12 +101,22 @@ export class LootItem extends Behaviour<typeof LootItem> {
       this.sendNetworkBroadcastEvent(Events.lootPickup, { player, loot: this.itemType });
     }
 
-    this.owningSpawner?.recycle(this.entity);
+    // 사운드가 끝나기 전에 바로 재활용되지 않도록 짧게 지연
+    this.recycleTimer = this.async.setTimeout(() => {
+      this.recycleTimer = undefined;
+      this.owningSpawner?.recycle(this.entity);
+    }, 1000);
   }
 
   // 아이템 활성화/비활성화 및 이펙트 관리
   public setActive(active: boolean) {
     this.isActive = active;
+
+    // 재활용 타이머가 남아 있을 때 새로 활성화되면 정리
+    if (active && this.recycleTimer !== undefined) {
+      this.async.clearTimeout(this.recycleTimer);
+      this.recycleTimer = undefined;
+    }
 
     // 루트 엔티티 충돌 상태도 함께 제어
     try {
