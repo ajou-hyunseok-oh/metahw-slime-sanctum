@@ -83,7 +83,7 @@ export class PlayerCamera extends hz.Component<typeof PlayerCamera> {
       this.connectNetworkEvent(player, PlayerCameraEvents.SetCameraFixedPositionWithEntity, ({entity, duration, easing}) => {
         this.setCameraFixedPositionWithEntity(entity, duration, easing);
       });
-      this.connectNetworkEvent(player, PlayerCameraEvents.SetCameraLobby, ({entity, duration, easing}) => {
+      this.connectNetworkEvent(player, PlayerCameraEvents.SetCameraLobby, ({entity, duration, easing}) => {        
         this.setCameraLobby(entity, duration, easing);
       });
       this.connectNetworkEvent(player, PlayerCameraEvents.SetCameraPan, ({positionOffset, translationSpeed}) => {
