@@ -14,6 +14,9 @@ import {
   ImageSource,
 } from "horizon/ui";
 
+// Horizon 스크립트 환경에서 setTimeout 타입 정의 보완
+declare function setTimeout(handler: (...args: any[]) => void, timeout?: number, ...args: any[]): number;
+
 type CardAssetProps = {
   clickSound: hz.Entity | undefined;
   // 유형별 배경/아이콘 (타입 기반 매핑)
@@ -155,6 +158,8 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
         defense: number;
         health: number;
     }) {
+        // UI 깜빡임 최소화를 위해 교체 전에 숨김
+        this.overlayDisplay.set("none");
         const picks: Array<{ type: string; level: number }> = [];
         const typePool = [...this.skillTypes]; // 중복 방지용 풀
 
@@ -183,6 +188,7 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
         }
 
         this.applyCardBindings(picks);
+        this.showOverlayWithDelay(); // 약간의 지연 후 다시 표시
     }
 
     private applyCardBindings(picks: Array<{ type: string; level: number }>) {
@@ -237,6 +243,14 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
          console.error("[LevelUpView] Cannot apply skill: Owner ID is not set!");
      }
    }
+
+  // 오버레이 표시를 지연시켜 깜빡임/잔상 최소화
+  private showOverlayWithDelay(delayMs: number = 120) {
+    this.overlayDisplay.set("none");
+    setTimeout(() => {
+      this.overlayDisplay.set("flex");
+    }, delayMs);
+  }
  
   // 오버레이/커스텀 UI 닫기 (정적 할당 방식이므로 삭제 대신 숨김 처리)
   private closeOverlay() {
