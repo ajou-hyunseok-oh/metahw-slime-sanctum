@@ -492,13 +492,14 @@ export class LevelUpView extends UIComponent<CardAssetProps> {
        children: [
          // 타이틀
          Text({
-           text: "Level Up",
+          text: "LEVEL UP",
            style: {
              fontFamily: this.FONT_TITLE,
              fontWeight: "800",
              fontSize: 48,
              color: "white",
-             marginBottom: 48,
+            marginTop: 24,
+            marginBottom: 36,
            },
          }),
          // 버튼 행
